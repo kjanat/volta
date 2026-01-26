@@ -1,15 +1,14 @@
 [package]
-name = "volta-migrate"
+name    = "volta-migrate"
 version = "0.1.0"
-authors = ["Charles Pierce <cpierce.grad@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-volta-core = { path = "../volta-core" }
+log          = { version = "0.4", features = ["std"] }
+node-semver  = "2"
+serde        = { version = "1.0.217", features = ["derive"] }
+serde_json   = { version = "1.0.135", features = ["preserve_order"] }
+tempfile     = "3.14.0"
+volta-core   = { path = "../volta-core" }
 volta-layout = { path = "../volta-layout" }
-log = { version = "0.4", features = ["std"] }
-tempfile = "3.14.0"
-node-semver = "2"
-serde_json = { version = "1.0.135", features = ["preserve_order"] }
-serde = { version = "1.0.217", features = ["derive"] }
-walkdir = "2.5.0"
+walkdir      = "2.5.0"
