@@ -1,12 +1,13 @@
 on:
   push:
     branches:
-      - main
+      - master
 
 name: API Docs
 
 jobs:
   publish:
+    if: false # Disabled: would publish to upstream volta-cli repo
     name: Build and publish
     runs-on: ubuntu-latest
     steps:
@@ -24,9 +25,9 @@ jobs:
       - name: Prepare docs for publication
         run: |
           mkdir -p publish
-          mv target/doc publish/main
-          echo '<!doctype html><a href="volta">volta</a>' > publish/main/index.html
-          echo '<!doctype html><a href="main">main</a>' > publish/index.html
+          mv target/doc publish/master
+          echo '<!doctype html><a href="volta">volta</a>' > publish/master/index.html
+          echo '<!doctype html><a href="master">master</a>' > publish/index.html
       - name: Publish docs to GitHub pages
         uses: JamesIves/github-pages-deploy-action@releases/v3
         with:

@@ -4,7 +4,7 @@ on:
       - v*
   pull_request:
     branches:
-      - main
+      - master
 
 name: Production
 
@@ -141,7 +141,7 @@ jobs:
       - macos
       - windows
       - windows-arm
-    if: github.event_name == 'push'
+    if: false # Disabled: would publish to upstream volta-cli repo
     steps:
       - name: Check out code
         uses: actions/checkout@v4
