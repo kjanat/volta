@@ -8,7 +8,7 @@ mod hook;
 pub mod inventory;
 pub mod layout;
 pub mod log;
-pub mod monitor;
+pub(crate) mod monitor;
 pub mod platform;
 pub mod project;
 pub mod run;
