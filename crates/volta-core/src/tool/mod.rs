@@ -167,12 +167,12 @@ impl ToolSpec {
     }
 
     /// The name of the tool, without the version, used for messaging
-    #[must_use] 
+    #[must_use]
     pub fn name(&self) -> &str {
         match self {
             Self::Node(_) => "Node",
-            Self::Npm(_) => "npm",
-            Self::Pnpm(_) => "pnpm",
+            Self::Npm(_) => "Npm",
+            Self::Pnpm(_) => "Pnpm",
             Self::Yarn(_) => "Yarn",
             Self::Package(name, _) => name,
         }
