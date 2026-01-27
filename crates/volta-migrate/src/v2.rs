@@ -7,7 +7,7 @@ use super::v1::V1;
 use log::debug;
 use nodejs_semver::Version;
 use tempfile::tempdir_in;
-use volta_core::error::{Context, ErrorKind, Fallible, FilesystemError, VoltaError};
+use volta_core::error::{Context, ErrorKind, Fallible, FilesystemError, ToolError, VoltaError};
 use volta_core::fs::{read_dir_eager, remove_dir_if_exists, remove_file_if_exists, rename};
 use volta_core::tool::load_default_npm_version;
 use volta_core::toolchain::serial::Platform;
@@ -172,16 +172,20 @@ fn remove_npm_version_from_node_image_dir(
     if old_install.exists() {
         let temp_image = temp_dir.join(&node_string);
         let new_install = new_home.node_image_dir(&node_string);
-        rename(&old_install, &temp_image).with_context(|| ErrorKind::SetupToolImageError {
-            tool: "Node".into(),
-            version: node_string.clone(),
-            dir: temp_image.clone(),
+        rename(&old_install, &temp_image).with_context(|| {
+            ErrorKind::Tool(ToolError::SetupImage {
+                tool: "Node".into(),
+                version: node_string.clone(),
+                dir: temp_image.clone(),
+            })
         })?;
         remove_dir_if_exists(&new_install)?;
-        rename(&temp_image, &new_install).with_context(|| ErrorKind::SetupToolImageError {
-            tool: "Node".into(),
-            version: node_string,
-            dir: temp_image,
+        rename(&temp_image, &new_install).with_context(|| {
+            ErrorKind::Tool(ToolError::SetupImage {
+                tool: "Node".into(),
+                version: node_string,
+                dir: temp_image,
+            })
         })?;
     }
     Ok(())

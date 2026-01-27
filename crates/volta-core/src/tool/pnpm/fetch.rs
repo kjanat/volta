@@ -7,7 +7,7 @@ use archive::{Archive, Tarball};
 use log::debug;
 use nodejs_semver::Version;
 
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, ToolError};
 use crate::fs::{
     create_staging_dir, create_staging_file, ensure_containing_dir_exists, rename, set_executable,
 };
@@ -44,11 +44,11 @@ pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible<()>
                 path: cache_file.clone(),
             })
         })?;
-        staging_file
-            .persist(cache_file)
-            .with_context(|| ErrorKind::PersistInventoryError {
+        staging_file.persist(cache_file).with_context(|| {
+            ErrorKind::Tool(ToolError::PersistInventory {
                 tool: "pnpm".into(),
-            })?;
+            })
+        })?;
     }
 
     Ok(())
@@ -70,9 +70,11 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
         .unpack(temp.path(), &mut |(), read| {
             progress.inc(read as u64);
         })
-        .with_context(|| ErrorKind::UnpackArchiveError {
-            tool: "pnpm".into(),
-            version: version_string.clone(),
+        .with_context(|| {
+            ErrorKind::Tool(ToolError::UnpackArchive {
+                tool: "pnpm".into(),
+                version: version_string.clone(),
+            })
         })?;
 
     let bin_path = temp.path().join("package").join("bin");
@@ -90,10 +92,12 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
         ErrorKind::Filesystem(FilesystemError::ContainingDir { path: dest.clone() })
     })?;
 
-    rename(temp.path().join("package"), &dest).with_context(|| ErrorKind::SetupToolImageError {
-        tool: "pnpm".into(),
-        version: version_string.clone(),
-        dir: dest.clone(),
+    rename(temp.path().join("package"), &dest).with_context(|| {
+        ErrorKind::Tool(ToolError::SetupImage {
+            tool: "pnpm".into(),
+            version: version_string.clone(),
+            dir: dest.clone(),
+        })
     })?;
 
     progress.finish_and_clear();

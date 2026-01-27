@@ -5,7 +5,7 @@ use std::path::Path;
 
 use super::manager::PackageManager;
 use crate::error::{
-    BinaryError, Context, ErrorKind, Fallible, FilesystemError, PackageError, VoltaError,
+    BinaryError, Context, ErrorKind, Fallible, FilesystemError, PackageError, ToolError, VoltaError,
 };
 use crate::fs::ensure_containing_dir_exists;
 use crate::layout::volta_home;
@@ -97,7 +97,7 @@ impl PackageConfig {
             })
         })?;
         serde_json::to_writer_pretty(file, &self)
-            .with_context(|| ErrorKind::StringifyPackageConfigError)
+            .with_context(|| ErrorKind::Tool(ToolError::SerializePackageConfig))
     }
 }
 
@@ -185,7 +185,7 @@ impl BinConfig {
             })
         })?;
         serde_json::to_writer_pretty(file, &self)
-            .with_context(|| ErrorKind::StringifyBinConfigError)
+            .with_context(|| ErrorKind::Tool(ToolError::SerializeBinConfig))
     }
 }
 

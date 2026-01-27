@@ -4,7 +4,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::process::ExitStatus;
 
-use crate::error::{ErrorKind, Fallible, ShimError};
+use crate::error::{ErrorKind, Fallible, ShimError, ToolError};
 use crate::platform::{Overrides, RuntimeImage, Sourced};
 use crate::session::Session;
 use log::debug;
@@ -116,7 +116,7 @@ fn get_executor(
 fn get_tool_name(args: &mut ArgsOs) -> Fallible<OsString> {
     args.next()
         .and_then(|arg0| Path::new(&arg0).file_name().map(tool_name_from_file_name))
-        .ok_or_else(|| ErrorKind::CouldNotDetermineTool.into())
+        .ok_or_else(|| ErrorKind::Tool(ToolError::CouldNotDetermine).into())
 }
 
 #[cfg(unix)]

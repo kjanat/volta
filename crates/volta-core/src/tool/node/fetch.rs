@@ -4,7 +4,7 @@ use std::fs::{File, read_to_string, write};
 use std::path::{Path, PathBuf};
 
 use super::NodeVersion;
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, ToolError};
 use crate::fs::{create_staging_dir, create_staging_file, ensure_containing_dir_exists, rename};
 use crate::hook::ToolHooks;
 use crate::layout::volta_home;
@@ -73,11 +73,11 @@ pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Node>>) -> Fallible<Nod
                 path: cache_file.clone(),
             })
         })?;
-        staging_file
-            .persist(cache_file)
-            .with_context(|| ErrorKind::PersistInventoryError {
+        staging_file.persist(cache_file).with_context(|| {
+            ErrorKind::Tool(ToolError::PersistInventory {
                 tool: "Node".into(),
-            })?;
+            })
+        })?;
     }
 
     Ok(node_version)
@@ -99,9 +99,11 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<Node
         .unpack(temp.path(), &mut |(), read| {
             progress.inc(read as u64);
         })
-        .with_context(|| ErrorKind::UnpackArchiveError {
-            tool: "Node".into(),
-            version: version_string.clone(),
+        .with_context(|| {
+            ErrorKind::Tool(ToolError::UnpackArchive {
+                tool: "Node".into(),
+                version: version_string.clone(),
+            })
         })?;
 
     // Save the npm version number in the npm version file for this distro
@@ -115,11 +117,11 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<Node
     })?;
 
     rename(temp.path().join(Node::archive_basename(version)), &dest).with_context(|| {
-        ErrorKind::SetupToolImageError {
+        ErrorKind::Tool(ToolError::SetupImage {
             tool: "Node".into(),
             version: version_string,
             dir: dest.clone(),
-        }
+        })
     })?;
 
     progress.finish_and_clear();

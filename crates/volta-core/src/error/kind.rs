@@ -9,16 +9,15 @@ use super::network::NetworkError;
 use super::package::PackageError;
 use super::platform::PlatformError;
 use super::shim::ShimError;
+use super::tool::ToolError;
 use super::version::VersionError;
 use crate::style::{text_width, tool_version};
-use textwrap::{fill, indent};
+use textwrap::fill;
 
 const REPORT_BUG_CTA: &str =
     "Please rerun the command that triggered this error with the environment
 variable `VOLTA_LOGLEVEL` set to `debug` and open an issue at
 https://github.com/volta-cli/volta/issues with the details!";
-
-const PERMISSIONS_CTA: &str = "Please ensure you have correct permissions to the Volta directory.";
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
@@ -37,6 +36,9 @@ pub enum ErrorKind {
 
     /// Wrapper for shim-related errors.
     Shim(ShimError),
+
+    /// Wrapper for tool-related errors.
+    Tool(ToolError),
 
     /// Wrapper for version-related errors.
     Version(VersionError),
@@ -59,8 +61,6 @@ pub enum ErrorKind {
     CompletionsOutFileError {
         path: PathBuf,
     },
-
-    CouldNotDetermineTool,
 
     /// Thrown when unable to start the migration executable
     CouldNotStartMigration,
@@ -94,12 +94,6 @@ pub enum ErrorKind {
     InvalidInvocationOfBareVersion {
         action: String,
         version: String,
-    },
-
-    /// Thrown when a tool name is invalid per npm's rules.
-    InvalidToolName {
-        name: String,
-        errors: Vec<String>,
     },
 
     /// Thrown when unable to acquire a lock on the Volta directory
@@ -137,46 +131,9 @@ pub enum ErrorKind {
     /// Thrown when unable to parse the npm manifest file from a node install
     ParseNpmManifestError,
 
-    /// Thrown when unable to parse a tool spec (`<tool>[@<version>]`)
-    ParseToolSpecError {
-        tool_spec: String,
-    },
-
-    /// Thrown when persisting an archive to the inventory fails
-    PersistInventoryError {
-        tool: String,
-    },
-
-    /// Thrown when there was an error setting a tool to executable
-    SetToolExecutable {
-        tool: String,
-    },
-
-    /// Thrown when there was an error copying an unpacked tool to the image directory
-    SetupToolImageError {
-        tool: String,
-        version: String,
-        dir: PathBuf,
-    },
-
-    /// Thrown when serializing a bin config to JSON fails
-    StringifyBinConfigError,
-
-    /// Thrown when serializing a package config to JSON fails
-    StringifyPackageConfigError,
-
-    /// Thrown when serializing the platform to JSON fails
-    StringifyPlatformError,
-
     /// Thrown when a given feature has not yet been implemented
     Unimplemented {
         feature: String,
-    },
-
-    /// Thrown when unpacking an archive (tarball or zip) fails
-    UnpackArchiveError {
-        tool: String,
-        version: String,
     },
 }
 
@@ -191,6 +148,7 @@ impl fmt::Display for ErrorKind {
             Self::Platform(e) => e.fmt(f),
             Self::Package(e) => e.fmt(f),
             Self::Shim(e) => e.fmt(f),
+            Self::Tool(e) => e.fmt(f),
             Self::Version(e) => e.fmt(f),
             Self::BuildPathError => write!(
                 f,
@@ -210,12 +168,6 @@ VOLTA_BYPASS is enabled, please ensure that the command exists on your system or
 
 Please remove the file or pass `-f` or `--force` to override.",
                 path.display()
-            ),
-            Self::CouldNotDetermineTool => write!(
-                f,
-                "Could not determine tool name
-
-{REPORT_BUG_CTA}"
             ),
             Self::CouldNotStartMigration => write!(
                 f,
@@ -307,24 +259,6 @@ To {action} the package '{version}', please use an explicit version such as '{ve
 
                 write!(f, "{error}\n\n{wrapped_cta}")
             }
-            Self::InvalidToolName { name, errors } => {
-                let indentation = "    ";
-                let joined = errors.join("\n");
-                let wrapped = text_width()
-                    .map_or_else(|| joined.clone(), |width| fill(&joined, width - indentation.len()));
-                let formatted_errs = indent(&wrapped, indentation);
-
-                let call_to_action = if errors.len() > 1 {
-                    "Please fix the following errors:"
-                } else {
-                    "Please fix the following error:"
-                };
-
-                write!(
-                    f,
-                    "Invalid tool name `{name}`\n\n{call_to_action}\n{formatted_errs}"
-                )
-            }
             // Note: No CTA as this error is purely informational and shouldn't be exposed to the user
             Self::LockAcquireError => write!(
                 f,
@@ -392,62 +326,9 @@ This project is configured to use version {version} of npm."
 
 Please ensure the version of Node is correct."
             ),
-            Self::ParseToolSpecError { tool_spec } => write!(
-                f,
-                "Could not parse tool spec `{tool_spec}`
-
-Please supply a spec in the format `<tool name>[@<version>]`."
-            ),
-            Self::PersistInventoryError { tool } => write!(
-                f,
-                "Could not store {tool} archive in inventory cache
-
-{PERMISSIONS_CTA}"
-            ),
-            Self::SetToolExecutable { tool } => write!(
-                f,
-                r#"Could not set "{tool}" to executable
-
-{PERMISSIONS_CTA}"#
-            ),
-            Self::SetupToolImageError { tool, version, dir } => write!(
-                f,
-                "Could not create environment for {} v{}
-at {}
-
-{}",
-                tool,
-                version,
-                dir.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::StringifyBinConfigError => write!(
-                f,
-                "Could not serialize executable configuration.
-
-{REPORT_BUG_CTA}"
-            ),
-            Self::StringifyPackageConfigError => write!(
-                f,
-                "Could not serialize package configuration.
-
-{REPORT_BUG_CTA}"
-            ),
-            Self::StringifyPlatformError => write!(
-                f,
-                "Could not serialize platform settings.
-
-{REPORT_BUG_CTA}"
-            ),
             Self::Unimplemented { feature } => {
                 write!(f, "{feature} is not supported yet.")
             }
-            Self::UnpackArchiveError { tool, version } => write!(
-                f,
-                "Could not unpack {tool} v{version}
-
-Please ensure the correct version is specified."
-            ),
         }
     }
 }
@@ -464,6 +345,12 @@ impl From<PackageError> for ErrorKind {
     }
 }
 
+impl From<ToolError> for ErrorKind {
+    fn from(error: ToolError) -> Self {
+        Self::Tool(error)
+    }
+}
+
 impl ErrorKind {
     #[must_use]
     pub const fn exit_code(&self) -> ExitCode {
@@ -476,6 +363,7 @@ impl ErrorKind {
             Self::Package(e) => e.exit_code(),
             Self::Platform(e) => e.exit_code(),
             Self::Shim(e) => e.exit_code(),
+            Self::Tool(e) => e.exit_code(),
             Self::Version(e) => e.exit_code(),
 
             // ConfigurationError
@@ -498,30 +386,19 @@ impl ErrorKind {
             Self::BypassError { .. } => ExitCode::ExecutionFailure,
 
             // FileSystemError
-            Self::ExtensionPathError { .. }
-            | Self::LockAcquireError
-            | Self::PersistInventoryError { .. }
-            | Self::SetupToolImageError { .. }
-            | Self::SetToolExecutable { .. } => ExitCode::FileSystemError,
+            Self::ExtensionPathError { .. } | Self::LockAcquireError => ExitCode::FileSystemError,
 
             // InvalidArguments
             Self::CompletionsOutFileError { .. }
             | Self::DeprecatedCommandError { .. }
             | Self::InvalidInvocation { .. }
-            | Self::InvalidInvocationOfBareVersion { .. }
-            | Self::InvalidToolName { .. }
-            | Self::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
+            | Self::InvalidInvocationOfBareVersion { .. } => ExitCode::InvalidArguments,
 
             // UnknownError
-            Self::CouldNotDetermineTool
-            | Self::ParseNodeIndexCacheError
+            Self::ParseNodeIndexCacheError
             | Self::ParseNodeIndexExpiryError
             | Self::ParseNpmManifestError
-            | Self::StringifyBinConfigError
-            | Self::StringifyPackageConfigError
-            | Self::StringifyPlatformError
-            | Self::Unimplemented { .. }
-            | Self::UnpackArchiveError { .. } => ExitCode::UnknownError,
+            | Self::Unimplemented { .. } => ExitCode::UnknownError,
         }
     }
 }

@@ -5,7 +5,7 @@ use std::path::Path;
 
 use super::super::download_tool_error;
 use super::super::registry::public_registry_package;
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, ToolError};
 use crate::fs::{
     create_staging_dir, create_staging_file, ensure_containing_dir_exists, rename, set_executable,
 };
@@ -46,7 +46,7 @@ pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Npm>>) -> Fallible<()> 
         })?;
         staging_file
             .persist(cache_file)
-            .with_context(|| ErrorKind::PersistInventoryError { tool: "npm".into() })?;
+            .with_context(|| ErrorKind::Tool(ToolError::PersistInventory { tool: "npm".into() }))?;
     }
 
     Ok(())
@@ -68,9 +68,11 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
         .unpack(temp.path(), &mut |(), read| {
             progress.inc(read as u64);
         })
-        .with_context(|| ErrorKind::UnpackArchiveError {
-            tool: "npm".into(),
-            version: version_string.clone(),
+        .with_context(|| {
+            ErrorKind::Tool(ToolError::UnpackArchive {
+                tool: "npm".into(),
+                version: version_string.clone(),
+            })
         })?;
 
     let bin_path = temp.path().join("package").join("bin");
@@ -88,10 +90,12 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
         ErrorKind::Filesystem(FilesystemError::ContainingDir { path: dest.clone() })
     })?;
 
-    rename(temp.path().join("package"), &dest).with_context(|| ErrorKind::SetupToolImageError {
-        tool: "npm".into(),
-        version: version_string.clone(),
-        dir: dest.clone(),
+    rename(temp.path().join("package"), &dest).with_context(|| {
+        ErrorKind::Tool(ToolError::SetupImage {
+            tool: "npm".into(),
+            version: version_string.clone(),
+            dir: dest.clone(),
+        })
     })?;
 
     progress.finish_and_clear();

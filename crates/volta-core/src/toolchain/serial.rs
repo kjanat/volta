@@ -1,4 +1,4 @@
-use crate::error::{Context, ErrorKind, Fallible, PlatformError, VoltaError};
+use crate::error::{Context, ErrorKind, Fallible, PlatformError, ToolError, VoltaError};
 use crate::platform::PlatformSpec;
 use crate::version::{option_version_serde, version_serde};
 use nodejs_semver::Version;
@@ -43,7 +43,8 @@ impl Platform {
     ///
     /// Returns an error if serialization fails.
     pub fn into_json(self) -> Fallible<String> {
-        serde_json::to_string_pretty(&self).with_context(|| ErrorKind::StringifyPlatformError)
+        serde_json::to_string_pretty(&self)
+            .with_context(|| ErrorKind::Tool(ToolError::SerializePlatform))
     }
 }
 

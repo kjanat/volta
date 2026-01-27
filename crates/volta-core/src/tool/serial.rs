@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use super::ToolSpec;
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{ErrorKind, Fallible, ToolError};
 use crate::version::{Tag, VersionSpec};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -31,20 +31,19 @@ impl ToolSpec {
     ///
     /// Returns an error if the tool spec cannot be parsed.
     pub fn try_from_str(tool_spec: &str) -> Fallible<Self> {
-        let captures =
-            TOOL_SPEC_PATTERN
-                .captures(tool_spec)
-                .ok_or_else(|| ErrorKind::ParseToolSpecError {
-                    tool_spec: tool_spec.into(),
-                })?;
+        let captures = TOOL_SPEC_PATTERN.captures(tool_spec).ok_or_else(|| {
+            ErrorKind::Tool(ToolError::ParseSpec {
+                tool_spec: tool_spec.into(),
+            })
+        })?;
 
         // Validate that the captured name is a valid NPM package name.
         let name = &captures["name"];
         if let Validity::Invalid { errors, .. } = validate(name) {
-            return Err(ErrorKind::InvalidToolName {
+            return Err(ErrorKind::Tool(ToolError::InvalidName {
                 name: name.into(),
                 errors,
-            }
+            })
             .into());
         }
 

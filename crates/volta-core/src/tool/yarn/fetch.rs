@@ -7,7 +7,7 @@ use super::super::download_tool_error;
 use super::super::registry::{
     find_unpack_dir, public_registry_package, scoped_public_registry_package,
 };
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, ToolError};
 use crate::fs::{
     create_staging_dir, create_staging_file, ensure_containing_dir_exists, rename, set_executable,
 };
@@ -46,11 +46,11 @@ pub fn fetch(version: &Version, hooks: Option<&YarnHooks>) -> Fallible<()> {
                 path: cache_file.clone(),
             })
         })?;
-        staging_file
-            .persist(cache_file)
-            .with_context(|| ErrorKind::PersistInventoryError {
+        staging_file.persist(cache_file).with_context(|| {
+            ErrorKind::Tool(ToolError::PersistInventory {
                 tool: "Yarn".into(),
-            })?;
+            })
+        })?;
     }
 
     Ok(())
@@ -72,9 +72,11 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
         .unpack(temp.path(), &mut |(), read| {
             progress.inc(read as u64);
         })
-        .with_context(|| ErrorKind::UnpackArchiveError {
-            tool: "Yarn".into(),
-            version: version_string.clone(),
+        .with_context(|| {
+            ErrorKind::Tool(ToolError::UnpackArchive {
+                tool: "Yarn".into(),
+                version: version_string.clone(),
+            })
         })?;
 
     let unpack_dir = find_unpack_dir(temp.path())?;
@@ -86,10 +88,12 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
         ErrorKind::Filesystem(FilesystemError::ContainingDir { path: dest.clone() })
     })?;
 
-    rename(unpack_dir, &dest).with_context(|| ErrorKind::SetupToolImageError {
-        tool: "Yarn".into(),
-        version: version_string.clone(),
-        dir: dest.clone(),
+    rename(unpack_dir, &dest).with_context(|| {
+        ErrorKind::Tool(ToolError::SetupImage {
+            tool: "Yarn".into(),
+            version: version_string.clone(),
+            dir: dest.clone(),
+        })
     })?;
 
     progress.finish_and_clear();
@@ -153,5 +157,6 @@ fn fetch_remote_distro(
 
 fn ensure_bin_is_executable(unpack_dir: &Path, tool: &str) -> Fallible<()> {
     let exec_path = unpack_dir.join("bin").join(tool);
-    set_executable(&exec_path).with_context(|| ErrorKind::SetToolExecutable { tool: tool.into() })
+    set_executable(&exec_path)
+        .with_context(|| ErrorKind::Tool(ToolError::SetExecutable { tool: tool.into() }))
 }

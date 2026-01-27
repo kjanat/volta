@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Tool;
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PackageError, PlatformError};
+use crate::error::{
+    Context, ErrorKind, Fallible, FilesystemError, PackageError, PlatformError, ToolError,
+};
 use crate::fs::{ensure_containing_dir_exists, remove_dir_if_exists, rename, symlink_dir};
 use crate::layout::volta_home;
 use crate::platform::{PlatformSpec, RuntimeImage};
@@ -331,10 +333,12 @@ where
         })
     })?;
 
-    rename(staging_dir, &package_dir).with_context(|| ErrorKind::SetupToolImageError {
-        tool: package_name.into(),
-        version: package_version.to_string(),
-        dir: package_dir,
+    rename(staging_dir, &package_dir).with_context(|| {
+        ErrorKind::Tool(ToolError::SetupImage {
+            tool: package_name.into(),
+            version: package_version.to_string(),
+            dir: package_dir,
+        })
     })?;
 
     Ok(())
