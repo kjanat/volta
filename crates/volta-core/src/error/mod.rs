@@ -21,6 +21,8 @@ pub use binary::BinaryError;
 #[allow(clippy::module_name_repetitions)]
 pub use filesystem::FilesystemError;
 #[allow(clippy::module_name_repetitions)]
+pub use hook::HookError;
+#[allow(clippy::module_name_repetitions)]
 pub use kind::ErrorKind;
 #[allow(clippy::module_name_repetitions)]
 pub use network::NetworkError;

@@ -3,7 +3,7 @@ use std::path::Path;
 
 use super::RegistryFormat;
 use super::tool;
-use crate::error::{ErrorKind, Fallible, VoltaError};
+use crate::error::{ErrorKind, Fallible, HookError, VoltaError};
 use crate::tool::{Node, Npm, Pnpm, Tool};
 use serde::{Deserialize, Serialize};
 
@@ -55,8 +55,8 @@ impl RawResolveHook {
                 prefix: None,
                 template: None,
                 bin: None,
-            } => Err(ErrorKind::HookNoFieldsSpecified.into()),
-            _ => Err(ErrorKind::HookMultipleFieldsSpecified.into()),
+            } => Err(ErrorKind::Hook(HookError::NoFieldsSpecified).into()),
+            _ => Err(ErrorKind::Hook(HookError::MultipleFieldsSpecified).into()),
         }
     }
 
@@ -118,8 +118,8 @@ impl TryFrom<RawPublishHook> for super::Publish {
             RawPublishHook {
                 url: None,
                 bin: None,
-            } => Err(ErrorKind::PublishHookNeitherUrlNorBin.into()),
-            _ => Err(ErrorKind::PublishHookBothUrlAndBin.into()),
+            } => Err(ErrorKind::Hook(HookError::PublishNeitherUrlNorBin).into()),
+            _ => Err(ErrorKind::Hook(HookError::PublishBothUrlAndBin).into()),
         }
     }
 }

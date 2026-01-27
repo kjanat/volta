@@ -1,12 +1,13 @@
 use std::fmt;
 use std::path::PathBuf;
 
+use super::ExitCode;
 use super::binary::BinaryError;
 use super::filesystem::FilesystemError;
+use super::hook::HookError;
 use super::network::NetworkError;
 use super::shim::ShimError;
 use super::version::VersionError;
-use super::ExitCode;
 use crate::style::{text_width, tool_version};
 use crate::tool::package::PackageManager;
 use textwrap::{fill, indent};
@@ -26,6 +27,9 @@ pub enum ErrorKind {
 
     /// Wrapper for filesystem-related errors.
     Filesystem(FilesystemError),
+
+    /// Wrapper for hook-related errors.
+    Hook(HookError),
 
     /// Wrapper for network-related errors.
     Network(NetworkError),
@@ -69,11 +73,6 @@ pub enum ErrorKind {
         advice: String,
     },
 
-    /// Thrown when unable to execute a hook command
-    ExecuteHookError {
-        command: String,
-    },
-
     /// Thrown when `volta.extends` keys result in an infinite cycle
     ExtensionCycleError {
         paths: Vec<PathBuf>,
@@ -85,33 +84,8 @@ pub enum ErrorKind {
         path: PathBuf,
     },
 
-    /// Thrown when a hook command returns a non-zero exit code
-    HookCommandFailed {
-        command: String,
-    },
-
-    /// Thrown when a hook contains multiple fields (prefix, template, or bin)
-    HookMultipleFieldsSpecified,
-
-    /// Thrown when a hook doesn't contain any of the known fields (prefix, template, or bin)
-    HookNoFieldsSpecified,
-
-    /// Thrown when determining the path to a hook fails
-    HookPathError {
-        command: String,
-    },
-
     /// Thrown when determining the name of a newly-installed package fails
     InstalledPackageNameError,
-
-    InvalidHookCommand {
-        command: String,
-    },
-
-    /// Thrown when output from a hook command could not be read
-    InvalidHookOutput {
-        command: String,
-    },
 
     /// Thrown when a user does e.g. `volta install node 12` instead of
     /// `volta install node@12`.
@@ -126,11 +100,6 @@ pub enum ErrorKind {
     InvalidInvocationOfBareVersion {
         action: String,
         version: String,
-    },
-
-    /// Thrown when a format other than "npm" or "github" is given for yarn.index in the hooks
-    InvalidRegistryFormat {
-        format: String,
     },
 
     /// Thrown when a tool name is invalid per npm's rules.
@@ -239,11 +208,6 @@ pub enum ErrorKind {
     /// Thrown when a package has been unpacked but is not formed correctly.
     PackageUnpackError,
 
-    /// Thrown when unable to parse a hooks.json file
-    ParseHooksError {
-        file: PathBuf,
-    },
-
     /// Thrown when unable to parse the node index cache
     ParseNodeIndexCacheError,
 
@@ -268,12 +232,6 @@ pub enum ErrorKind {
     PersistInventoryError {
         tool: String,
     },
-
-    /// Thrown when a publish hook contains both the url and bin fields
-    PublishHookBothUrlAndBin,
-
-    /// Thrown when a publish hook contains neither url nor bin fields
-    PublishHookNeitherUrlNorBin,
 
     /// Thrown when there was an error setting a tool to executable
     SetToolExecutable {
@@ -326,6 +284,7 @@ impl fmt::Display for ErrorKind {
         match self {
             Self::Binary(e) => e.fmt(f),
             Self::Filesystem(e) => e.fmt(f),
+            Self::Hook(e) => e.fmt(f),
             Self::Network(e) => e.fmt(f),
             Self::Shim(e) => e.fmt(f),
             Self::Version(e) => e.fmt(f),
@@ -375,12 +334,6 @@ Please ensure you have 'volta-migrate' on your PATH and run it directly."
             Self::DeprecatedCommandError { command, advice } => {
                 write!(f, "The subcommand `{command}` is deprecated.\n{advice}")
             }
-            Self::ExecuteHookError { command } => write!(
-                f,
-                "Could not execute hook command: '{command}'
-
-Please ensure that the correct command is specified."
-            ),
             Self::ExtensionCycleError { paths, duplicate } => {
                 // Detected infinite loop in project workspace:
                 //
@@ -413,49 +366,12 @@ Please ensure that the correct command is specified."
 Please ensure that the file exists and is accessible.",
                 path.display(),
             ),
-            Self::HookCommandFailed { command } => write!(
-                f,
-                "Hook command '{command}' indicated a failure.
-
-Please verify the requested tool and version."
-            ),
-            Self::HookMultipleFieldsSpecified => write!(
-                f,
-                "Hook configuration includes multiple hook types.
-
-Please include only one of 'bin', 'prefix', or 'template'"
-            ),
-            Self::HookNoFieldsSpecified => write!(
-                f,
-                "Hook configuration includes no hook types.
-
-Please include one of 'bin', 'prefix', or 'template'"
-            ),
-            Self::HookPathError { command } => write!(
-                f,
-                "Could not determine path to hook command: '{command}'
-
-Please ensure that the correct command is specified."
-            ),
             Self::InstalledPackageNameError => write!(
                 f,
                 "Could not determine the name of the package that was just installed.
 
 {REPORT_BUG_CTA}"
             ),
-            Self::InvalidHookCommand { command } => write!(
-                f,
-                "Invalid hook command: '{command}'
-
-Please ensure that the correct command is specified."
-            ),
-            Self::InvalidHookOutput { command } => write!(
-                f,
-                "Could not read output from hook command: '{command}'
-
-Please ensure that the command output is valid UTF-8 text."
-            ),
-
             Self::InvalidInvocation {
                 action,
                 name,
@@ -505,14 +421,6 @@ To {action} the package '{version}', please use an explicit version such as '{ve
 
                 write!(f, "{error}\n\n{wrapped_cta}")
             }
-
-            Self::InvalidRegistryFormat { format } => write!(
-                f,
-                "Unrecognized index registry format: '{format}'
-
-Please specify either 'npm' or 'github' for the format."
-            ),
-
             Self::InvalidToolName { name, errors } => {
                 let indentation = "    ";
                 let joined = errors.join("\n");
@@ -692,14 +600,6 @@ Please ensure that the file exists.",
 
 Please ensure the package is correctly formatted."
             ),
-            Self::ParseHooksError { file } => write!(
-                f,
-                "Could not parse hooks configuration file.
-from {}
-
-Please ensure the file is correctly formatted.",
-                file.display()
-            ),
             Self::ParseNodeIndexCacheError => write!(
                 f,
                 "Could not parse Node index cache file.
@@ -741,18 +641,6 @@ Please supply a spec in the format `<tool name>[@<version>]`."
                 "Could not store {tool} archive in inventory cache
 
 {PERMISSIONS_CTA}"
-            ),
-            Self::PublishHookBothUrlAndBin => write!(
-                f,
-                "Publish hook configuration includes both hook types.
-
-Please include only one of 'bin' or 'url'"
-            ),
-            Self::PublishHookNeitherUrlNorBin => write!(
-                f,
-                "Publish hook configuration includes no hook types.
-
-Please include one of 'bin' or 'url'"
             ),
             Self::SetToolExecutable { tool } => write!(
                 f,
@@ -834,17 +722,13 @@ impl ErrorKind {
             // Delegated errors
             Self::Binary(e) => e.exit_code(),
             Self::Filesystem(e) => e.exit_code(),
+            Self::Hook(e) => e.exit_code(),
             Self::Network(e) => e.exit_code(),
             Self::Shim(e) => e.exit_code(),
             Self::Version(e) => e.exit_code(),
 
             // ConfigurationError
             Self::ExtensionCycleError { .. }
-            | Self::HookCommandFailed { .. }
-            | Self::HookMultipleFieldsSpecified
-            | Self::HookNoFieldsSpecified
-            | Self::HookPathError { .. }
-            | Self::InvalidRegistryFormat { .. }
             | Self::NoCommandLinePnpm
             | Self::NoCommandLineYarn
             | Self::NoDefaultNodeVersion { .. }
@@ -861,10 +745,7 @@ impl ErrorKind {
             | Self::PackageManifestParseError { .. }
             | Self::PackageParseError { .. }
             | Self::PackageUnpackError
-            | Self::ParseHooksError { .. }
             | Self::ParsePlatformError
-            | Self::PublishHookBothUrlAndBin
-            | Self::PublishHookNeitherUrlNorBin
             | Self::UpgradePackageNotFound { .. }
             | Self::UpgradePackageWrongManager { .. } => ExitCode::ConfigurationError,
 
@@ -877,14 +758,10 @@ impl ErrorKind {
             | Self::NoShellProfile { .. } => ExitCode::EnvironmentError,
 
             // ExecutableNotFound
-            Self::InvalidHookCommand { .. } | Self::NpxNotAvailable { .. } => {
-                ExitCode::ExecutableNotFound
-            }
+            Self::NpxNotAvailable { .. } => ExitCode::ExecutableNotFound,
 
             // ExecutionFailure
-            Self::BypassError { .. }
-            | Self::ExecuteHookError { .. }
-            | Self::InvalidHookOutput { .. } => ExitCode::ExecutionFailure,
+            Self::BypassError { .. } => ExitCode::ExecutionFailure,
 
             // FileSystemError
             Self::ExtensionPathError { .. }

@@ -6,7 +6,7 @@ use std::iter::once;
 use std::marker::PhantomData;
 use std::path::Path;
 
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, HookError};
 use crate::layout::volta_home;
 use crate::project::Project;
 use crate::tool::{Node, Npm, Pnpm, Tool};
@@ -206,10 +206,11 @@ impl HookConfig {
             })
         })?;
 
-        let raw: serial::RawHookConfig =
-            serde_json::de::from_reader(file).with_context(|| ErrorKind::ParseHooksError {
+        let raw: serial::RawHookConfig = serde_json::de::from_reader(file).with_context(|| {
+            ErrorKind::Hook(HookError::ParseFailed {
                 file: file_path.to_path_buf(),
-            })?;
+            })
+        })?;
 
         // Invariant: Since we successfully loaded it, we know we have a valid file path
         let hooks_path = file_path.parent().expect("File paths always have a parent");
@@ -241,9 +242,9 @@ impl RegistryFormat {
         match raw_format {
             "npm" => Ok(Self::Npm),
             "github" => Ok(Self::Github),
-            other => Err(ErrorKind::InvalidRegistryFormat {
+            other => Err(ErrorKind::Hook(HookError::InvalidRegistryFormat {
                 format: String::from(other),
-            }
+            })
             .into()),
         }
     }

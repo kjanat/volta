@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use crate::command::create_command;
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, HookError};
 use crate::hook::RegistryFormat;
 use crate::tool::{NODE_DISTRO_ARCH, NODE_DISTRO_OS};
 use cmdline_words_parser::parse_posix;
@@ -127,17 +127,19 @@ fn execute_binary(bin: &str, base_path: &Path, extra_arg: Option<String>) -> Fal
         Some(word) => {
             // Treat any path that starts with a './' or '../' as a relative path (using OS separator)
             if word.starts_with(REL_PATH.as_str()) || word.starts_with(REL_PATH_PARENT.as_str()) {
-                canonicalize(base_path.join(word)).with_context(|| ErrorKind::HookPathError {
-                    command: String::from(word),
+                canonicalize(base_path.join(word)).with_context(|| {
+                    ErrorKind::Hook(HookError::PathResolutionFailed {
+                        command: String::from(word),
+                    })
                 })?
             } else {
                 PathBuf::from(word)
             }
         }
         None => {
-            return Err(ErrorKind::InvalidHookCommand {
+            return Err(ErrorKind::Hook(HookError::InvalidCommand {
                 command: String::from(bin.trim()),
-            }
+            })
             .into());
         }
     };
@@ -156,21 +158,23 @@ fn execute_binary(bin: &str, base_path: &Path, extra_arg: Option<String>) -> Fal
         .stderr(Stdio::inherit());
 
     debug!("Running hook command: {command:?}");
-    let output = command
-        .output()
-        .with_context(|| ErrorKind::ExecuteHookError {
+    let output = command.output().with_context(|| {
+        ErrorKind::Hook(HookError::ExecutionFailed {
             command: String::from(bin.trim()),
-        })?;
+        })
+    })?;
 
     if !output.status.success() {
-        return Err(ErrorKind::HookCommandFailed {
+        return Err(ErrorKind::Hook(HookError::CommandFailed {
             command: bin.trim().into(),
-        }
+        })
         .into());
     }
 
-    let url = String::from_utf8(output.stdout).with_context(|| ErrorKind::InvalidHookOutput {
-        command: String::from(bin.trim()),
+    let url = String::from_utf8(output.stdout).with_context(|| {
+        ErrorKind::Hook(HookError::InvalidOutput {
+            command: String::from(bin.trim()),
+        })
     })?;
 
     Ok(url.trim().to_string())
