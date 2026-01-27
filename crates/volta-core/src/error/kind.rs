@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use super::ExitCode;
 use super::binary::BinaryError;
+use super::environment::EnvironmentError;
 use super::filesystem::FilesystemError;
 use super::hook::HookError;
 use super::network::NetworkError;
@@ -24,6 +25,9 @@ https://github.com/volta-cli/volta/issues with the details!";
 pub enum ErrorKind {
     /// Wrapper for binary-related errors.
     Binary(BinaryError),
+
+    /// Wrapper for environment-related errors.
+    Environment(EnvironmentError),
 
     /// Wrapper for filesystem-related errors.
     Filesystem(FilesystemError),
@@ -48,9 +52,6 @@ pub enum ErrorKind {
 
     /// Wrapper for package-related errors.
     Package(PackageError),
-
-    /// Thrown when building the virtual environment path fails
-    BuildPathError,
 
     /// Thrown when unable to launch a command with `VOLTA_BYPASS` set
     BypassError {
@@ -96,27 +97,11 @@ pub enum ErrorKind {
         version: String,
     },
 
-    /// Thrown when unable to acquire a lock on the Volta directory
-    LockAcquireError,
-
     /// Thrown when pnpm is not set at the command-line
     NoCommandLinePnpm,
 
     /// Thrown when Yarn is not set at the command-line
     NoCommandLineYarn,
-
-    NoHomeEnvironmentVar,
-
-    /// Thrown when the install dir could not be determined
-    NoInstallDir,
-
-    NoLocalDataDir,
-
-    /// Thrown when no shell profiles could be found
-    NoShellProfile {
-        env_profile: String,
-        bin_dir: PathBuf,
-    },
 
     NpxNotAvailable {
         version: String,
@@ -142,6 +127,7 @@ impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Binary(e) => e.fmt(f),
+            Self::Environment(e) => e.fmt(f),
             Self::Filesystem(e) => e.fmt(f),
             Self::Hook(e) => e.fmt(f),
             Self::Network(e) => e.fmt(f),
@@ -150,12 +136,6 @@ impl fmt::Display for ErrorKind {
             Self::Shim(e) => e.fmt(f),
             Self::Tool(e) => e.fmt(f),
             Self::Version(e) => e.fmt(f),
-            Self::BuildPathError => write!(
-                f,
-                "Could not create execution environment.
-
-Please ensure your PATH is valid."
-            ),
             Self::BypassError { command } => write!(
                 f,
                 "Could not execute command '{command}'
@@ -259,11 +239,6 @@ To {action} the package '{version}', please use an explicit version such as '{ve
 
                 write!(f, "{error}\n\n{wrapped_cta}")
             }
-            // Note: No CTA as this error is purely informational and shouldn't be exposed to the user
-            Self::LockAcquireError => write!(
-                f,
-                "Unable to acquire lock on Volta directory"
-            ),
             Self::NoCommandLinePnpm => write!(
                 f,
                 "No pnpm version specified.
@@ -275,32 +250,6 @@ Use `volta run --pnpm` to select a version (see `volta help run` for more info).
                 "No Yarn version specified.
 
 Use `volta run --yarn` to select a version (see `volta help run` for more info)."
-            ),
-            Self::NoHomeEnvironmentVar => write!(
-                f,
-                "Could not determine home directory.
-
-Please ensure the environment variable 'HOME' is set."
-            ),
-            Self::NoInstallDir => write!(
-                f,
-                "Could not determine Volta install directory.
-
-Please ensure Volta was installed correctly"
-            ),
-            Self::NoLocalDataDir => write!(
-                f,
-                "Could not determine LocalAppData directory.
-
-Please ensure the directory is available."
-            ),
-            Self::NoShellProfile { env_profile, bin_dir } => write!(
-                f,
-                "Could not locate user profile.
-Tried $PROFILE ({}), ~/.bashrc, ~/.bash_profile, ~/.zshenv ~/.zshrc, ~/.profile, and ~/.config/fish/config.fish
-
-Please create one of these and try again; or you can edit your profile manually to add '{}' to your PATH",
-                env_profile, bin_dir.display()
             ),
             Self::NpxNotAvailable { version } => write!(
                 f,
@@ -351,12 +300,19 @@ impl From<ToolError> for ErrorKind {
     }
 }
 
+impl From<EnvironmentError> for ErrorKind {
+    fn from(error: EnvironmentError) -> Self {
+        Self::Environment(error)
+    }
+}
+
 impl ErrorKind {
     #[must_use]
     pub const fn exit_code(&self) -> ExitCode {
         match self {
             // Delegated errors
             Self::Binary(e) => e.exit_code(),
+            Self::Environment(e) => e.exit_code(),
             Self::Filesystem(e) => e.exit_code(),
             Self::Hook(e) => e.exit_code(),
             Self::Network(e) => e.exit_code(),
@@ -372,12 +328,7 @@ impl ErrorKind {
             | Self::NoCommandLineYarn => ExitCode::ConfigurationError,
 
             // EnvironmentError
-            Self::BuildPathError
-            | Self::CouldNotStartMigration
-            | Self::NoHomeEnvironmentVar
-            | Self::NoInstallDir
-            | Self::NoLocalDataDir
-            | Self::NoShellProfile { .. } => ExitCode::EnvironmentError,
+            Self::CouldNotStartMigration => ExitCode::EnvironmentError,
 
             // ExecutableNotFound
             Self::NpxNotAvailable { .. } => ExitCode::ExecutableNotFound,
@@ -386,7 +337,7 @@ impl ErrorKind {
             Self::BypassError { .. } => ExitCode::ExecutionFailure,
 
             // FileSystemError
-            Self::ExtensionPathError { .. } | Self::LockAcquireError => ExitCode::FileSystemError,
+            Self::ExtensionPathError { .. } => ExitCode::FileSystemError,
 
             // InvalidArguments
             Self::CompletionsOutFileError { .. }

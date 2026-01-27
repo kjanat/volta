@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, EnvironmentError, Fallible};
 use cfg_if::cfg_if;
 use dunce::canonicalize;
 use once_cell::sync::OnceCell;
@@ -61,5 +61,5 @@ fn default_install_dir() -> Fallible<PathBuf> {
             path.pop(); // Remove the executable name from the path
             path
         })
-        .with_context(|| ErrorKind::NoInstallDir)
+        .with_context(|| EnvironmentError::NoInstallDir.into())
 }

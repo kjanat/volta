@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use super::executor::{Executor, ToolCommand, ToolKind};
 use super::{debug_active_image, debug_no_platform};
-use crate::error::{BinaryError, Context, ErrorKind, Fallible, PlatformError};
+use crate::error::{BinaryError, Context, EnvironmentError, ErrorKind, Fallible, PlatformError};
 use crate::layout::volta_home;
 use crate::platform::{Platform, Sourced, System};
 use crate::session::Session;
@@ -184,5 +184,5 @@ fn shared_module_path() -> Fallible<OsString> {
         .split()
         .prefix_entry(volta_home()?.shared_lib_root())
         .join()
-        .with_context(|| ErrorKind::BuildPathError)
+        .with_context(|| EnvironmentError::BuildPath.into())
 }

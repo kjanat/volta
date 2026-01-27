@@ -19,6 +19,8 @@ mod version;
 #[allow(clippy::module_name_repetitions)]
 pub use binary::BinaryError;
 #[allow(clippy::module_name_repetitions)]
+pub use environment::EnvironmentError;
+#[allow(clippy::module_name_repetitions)]
 pub use filesystem::FilesystemError;
 #[allow(clippy::module_name_repetitions)]
 pub use hook::HookError;

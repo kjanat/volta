@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{EnvironmentError, ErrorKind, Fallible};
 use crate::session::Session;
 use crate::tool::{Node, Npm, Pnpm, Yarn};
 use nodejs_semver::Version;
@@ -311,6 +311,6 @@ impl Platform {
     }
 }
 
-const fn build_path_error() -> ErrorKind {
-    ErrorKind::BuildPathError
+fn build_path_error() -> ErrorKind {
+    EnvironmentError::BuildPath.into()
 }

@@ -35,7 +35,7 @@ mod os {
     use std::path::{Path, PathBuf};
 
     use log::{debug, warn};
-    use volta_core::error::{ErrorKind, Fallible};
+    use volta_core::error::{EnvironmentError, ErrorKind, Fallible};
     use volta_core::layout::volta_home;
 
     pub fn setup_environment() -> Fallible<()> {
@@ -80,10 +80,10 @@ mod os {
         if found_profile {
             Ok(())
         } else {
-            Err(ErrorKind::NoShellProfile {
+            Err(ErrorKind::from(EnvironmentError::NoShellProfile {
                 env_profile: String::new(),
                 bin_dir: home.shim_dir().to_owned(),
-            }
+            })
             .into())
         }
     }
@@ -92,7 +92,7 @@ mod os {
     ///
     /// Any file in the list should be created if it doesn't already exist
     fn determine_profiles() -> Fallible<Vec<PathBuf>> {
-        let home_dir = dirs::home_dir().ok_or(ErrorKind::NoHomeEnvironmentVar)?;
+        let home_dir = dirs::home_dir().ok_or_else(|| ErrorKind::from(EnvironmentError::NoHome))?;
         let shell = env::var("SHELL").unwrap_or_else(|_| String::new());
         // Always include `~/.profile`
         let mut profiles = vec![home_dir.join(".profile")];

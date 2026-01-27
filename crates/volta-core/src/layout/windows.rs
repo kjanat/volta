@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use super::{volta_home, volta_install};
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{EnvironmentError, ErrorKind, Fallible};
 
 pub(super) fn default_home_dir() -> Fallible<PathBuf> {
-    let mut home = dirs::data_local_dir().ok_or(ErrorKind::NoLocalDataDir)?;
+    let mut home = dirs::data_local_dir().ok_or(ErrorKind::from(EnvironmentError::NoLocalData))?;
     home.push("Volta");
     Ok(home)
 }
