@@ -30,7 +30,7 @@ impl Command for Uninstall {
             };
         }
 
-        tool.uninstall()?;
+        tool.uninstall(session.pnpm_enabled())?;
 
         session.add_event_end(ActivityKind::Uninstall, ExitCode::Success);
         Ok(ExitCode::Success)

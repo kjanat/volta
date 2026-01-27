@@ -1,4 +1,3 @@
-use std::env;
 use std::fmt::{self, Display};
 use std::path::PathBuf;
 
@@ -8,7 +7,6 @@ use crate::session::Session;
 use crate::style::{note_prefix, success_prefix, tool_version};
 use crate::sync::VoltaLock;
 use crate::version::VersionSpec;
-use crate::VOLTA_FEATURE_PNPM;
 use cfg_if::cfg_if;
 use log::{debug, info};
 
@@ -111,7 +109,7 @@ impl Spec {
                 // to handle resolving (and ultimately fetching / installing) pnpm. If not, then
                 // fall back to the global package behavior, which was the case prior to pnpm
                 // support being added
-                if env::var_os(VOLTA_FEATURE_PNPM).is_some() {
+                if session.pnpm_enabled() {
                     let version = pnpm::resolve(version, session)?;
                     Ok(Box::new(Pnpm::new(version)))
                 } else {
@@ -139,7 +137,7 @@ impl Spec {
     /// # Errors
     ///
     /// Returns an error if the tool cannot be uninstalled.
-    pub fn uninstall(self) -> Fallible<()> {
+    pub fn uninstall(self, pnpm_enabled: bool) -> Fallible<()> {
         match self {
             Self::Node(_) => Err(ErrorKind::Unimplemented {
                 feature: "Uninstalling node".into(),
@@ -150,7 +148,7 @@ impl Spec {
             }
             .into()),
             Self::Pnpm(_) => {
-                if env::var_os(VOLTA_FEATURE_PNPM).is_some() {
+                if pnpm_enabled {
                     Err(ErrorKind::Unimplemented {
                         feature: "Uninstalling pnpm".into(),
                     }

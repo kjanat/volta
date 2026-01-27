@@ -73,7 +73,7 @@ impl Executor {
             Self::PackageLink(cmd) => cmd.execute(session),
             Self::PackageUpgrade(cmd) => cmd.execute(session),
             Self::InternalInstall(cmd) => cmd.execute(session),
-            Self::Uninstall(cmd) => cmd.execute(),
+            Self::Uninstall(cmd) => cmd.execute(session),
             Self::Multiple(executors) => {
                 info!(
                     "{} Volta is processing each package separately",
@@ -542,14 +542,14 @@ impl UninstallCommand {
     }
 
     /// Runs the uninstall with Volta's internal uninstall logic
-    fn execute(self) -> Fallible<ExitStatus> {
+    fn execute(self, session: &Session) -> Fallible<ExitStatus> {
         info!(
             "{} using Volta to uninstall {}",
             note_prefix(),
             self.tool.name()
         );
 
-        self.tool.uninstall()?;
+        self.tool.uninstall(session.pnpm_enabled())?;
 
         Ok(ExitStatus::from_raw(0))
     }

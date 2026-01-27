@@ -7,7 +7,6 @@ use std::process::ExitStatus;
 use crate::error::{ErrorKind, Fallible};
 use crate::platform::{Overrides, Image, Sourced};
 use crate::session::Session;
-use crate::VOLTA_FEATURE_PNPM;
 use log::debug;
 use nodejs_semver::Version;
 
@@ -101,7 +100,7 @@ fn get_executor(
                 // If the pnpm feature flag variable is set, delegate to the pnpm handler
                 // If not, use the binary handler as a fallback (prior to pnpm support, installing
                 // pnpm would be handled the same as any other global binary)
-                if env::var_os(VOLTA_FEATURE_PNPM).is_some() {
+                if session.pnpm_enabled() {
                     pnpm::command(args, session, ignore_recursion)
                 } else {
                     binary::command(exe, args, session)

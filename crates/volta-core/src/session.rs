@@ -2,6 +2,7 @@
 //! execution of a Volta tool, including their current directory, Volta
 //! hook configuration, and the state of the local inventory.
 
+use std::env;
 use std::fmt::{self, Display, Formatter};
 use std::process::exit;
 
@@ -11,6 +12,7 @@ use crate::hook::{HookConfig, LazyHookConfig};
 use crate::platform::PlatformSpec;
 use crate::project::{LazyProject, Project};
 use crate::toolchain::{LazyToolchain, Toolchain};
+use crate::VOLTA_FEATURE_PNPM;
 use log::debug;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
@@ -84,18 +86,27 @@ pub struct Session {
     toolchain: LazyToolchain,
     project: LazyProject,
     event_log: Log,
+    /// Cached result of checking `VOLTA_FEATURE_PNPM` environment variable
+    pnpm_enabled: bool,
 }
 
 impl Session {
     /// Constructs a new `Session`.
     #[must_use]
-    pub const fn init() -> Self {
+    pub fn init() -> Self {
         Self {
             hooks: LazyHookConfig::init(),
             toolchain: LazyToolchain::init(),
             project: LazyProject::init(),
             event_log: Log::init(),
+            pnpm_enabled: env::var_os(VOLTA_FEATURE_PNPM).is_some(),
         }
+    }
+
+    /// Returns whether the pnpm feature flag is enabled.
+    #[must_use]
+    pub const fn pnpm_enabled(&self) -> bool {
+        self.pnpm_enabled
     }
 
     /// Produces a reference to the current Node project, if any.
