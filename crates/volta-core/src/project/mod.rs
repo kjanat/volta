@@ -6,7 +6,7 @@ use std::ffi::OsStr;
 use std::iter::once;
 use std::path::{Path, PathBuf};
 
-use node_semver::Version;
+use nodejs_semver::Version;
 use once_cell::unsync::OnceCell;
 
 use crate::error::{Context, ErrorKind, Fallible, VoltaError};
@@ -23,25 +23,41 @@ mod tests;
 use serial::{update_manifest, Manifest, ManifestKey};
 
 /// A lazily loaded Project
+#[allow(clippy::module_name_repetitions)]
 pub struct LazyProject {
     project: OnceCell<Option<Project>>,
 }
 
 impl LazyProject {
-    pub fn init() -> Self {
-        LazyProject {
+    #[must_use]
+    pub const fn init() -> Self {
+        Self {
             project: OnceCell::new(),
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the project cannot be loaded.
     pub fn get(&self) -> Fallible<Option<&Project>> {
         let project = self.project.get_or_try_init(Project::for_current_dir)?;
         Ok(project.as_ref())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the project cannot be loaded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `OnceCell` is not initialized after `get_or_try_init` succeeds (internal invariant violation).
     pub fn get_mut(&mut self) -> Fallible<Option<&mut Project>> {
-        let _ = self.project.get_or_try_init(Project::for_current_dir)?;
-        Ok(self.project.get_mut().unwrap().as_mut())
+        self.project.get_or_try_init(Project::for_current_dir)?;
+        Ok(self
+            .project
+            .get_mut()
+            .expect("cell initialized above")
+            .as_mut())
     }
 }
 
@@ -65,13 +81,13 @@ impl Project {
     ///
     /// Will search ancestors to find a `package.json` and use that as the root of the project
     fn for_dir(base_dir: PathBuf) -> Fallible<Option<Self>> {
-        match find_closest_root(base_dir) {
-            Some(mut project) => {
+        find_closest_root(base_dir).map_or_else(
+            || Ok(None),
+            |mut project| {
                 project.push("package.json");
                 Self::from_file(project).map(Some)
-            }
-            None => Ok(None),
-        }
+            },
+        )
     }
 
     /// Creates a Project instance from the given package manifest file (`package.json`)
@@ -111,7 +127,7 @@ impl Project {
 
         let platform = platform.map(TryInto::try_into).transpose()?;
 
-        Ok(Project {
+        Ok(Self {
             manifest_file,
             workspace_manifests,
             dependencies,
@@ -120,29 +136,36 @@ impl Project {
     }
 
     /// Returns a reference to the manifest file for the current project
+    #[must_use]
     pub fn manifest_file(&self) -> &Path {
         &self.manifest_file
     }
 
     /// Returns an iterator of paths to all of the workspace roots
     pub fn workspace_roots(&self) -> impl Iterator<Item = &Path> {
-        // Invariant: self.manifest_file and self.extensions will only contain paths to files that we successfully loaded
+        // Invariant: self.manifest_file and self.workspace_manifests only contain paths to files we successfully loaded
         once(&self.manifest_file)
             .chain(self.workspace_manifests.iter())
-            .map(|file| file.parent().expect("File paths always have a parent"))
+            .filter_map(|file| file.parent())
     }
 
     /// Returns a reference to the Project's `PlatformSpec`, if available
-    pub fn platform(&self) -> Option<&PlatformSpec> {
+    #[must_use]
+    pub const fn platform(&self) -> Option<&PlatformSpec> {
         self.platform.as_ref()
     }
 
     /// Returns true if the project dependency map contains the specified dependency
+    #[must_use]
     pub fn has_direct_dependency(&self, dependency: &str) -> bool {
         self.dependencies.contains_key(dependency)
     }
 
     /// Returns true if the input binary name is a direct dependency of the input project
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bin config cannot be read.
     pub fn has_direct_bin(&self, bin_name: &OsStr) -> Fallible<bool> {
         if let Some(name) = bin_name.to_str() {
             let config_path = volta_home()?.default_tool_bin_config(name);
@@ -170,8 +193,9 @@ impl Project {
         })
     }
 
-    /// Yarn projects that are using PnP or pnpm linker need to use yarn run.
+    /// Yarn projects that are using `PnP` or pnpm linker need to use yarn run.
     // (project uses Yarn berry if 'yarnrc.yml' exists, uses PnP if '.pnp.js' or '.pnp.cjs' exist)
+    #[must_use]
     pub fn needs_yarn_run(&self) -> bool {
         self.platform()
             .is_some_and(|platform| platform.yarn.is_some())
@@ -183,8 +207,12 @@ impl Project {
     }
 
     /// Pins the Node version in this project's manifest file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest cannot be updated.
     pub fn pin_node(&mut self, version: Version) -> Fallible<()> {
-        update_manifest(&self.manifest_file, ManifestKey::Node, Some(&version))?;
+        update_manifest(&self.manifest_file, &ManifestKey::Node, Some(&version))?;
 
         if let Some(platform) = self.platform.as_mut() {
             platform.node = version;
@@ -201,9 +229,13 @@ impl Project {
     }
 
     /// Pins the npm version in this project's manifest file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest cannot be updated or no Node is pinned.
     pub fn pin_npm(&mut self, version: Option<Version>) -> Fallible<()> {
         if let Some(platform) = self.platform.as_mut() {
-            update_manifest(&self.manifest_file, ManifestKey::Npm, version.as_ref())?;
+            update_manifest(&self.manifest_file, &ManifestKey::Npm, version.as_ref())?;
 
             platform.npm = version;
 
@@ -214,9 +246,13 @@ impl Project {
     }
 
     /// Pins the pnpm version in this project's manifest file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest cannot be updated or no Node is pinned.
     pub fn pin_pnpm(&mut self, version: Option<Version>) -> Fallible<()> {
         if let Some(platform) = self.platform.as_mut() {
-            update_manifest(&self.manifest_file, ManifestKey::Pnpm, version.as_ref())?;
+            update_manifest(&self.manifest_file, &ManifestKey::Pnpm, version.as_ref())?;
 
             platform.pnpm = version;
 
@@ -230,9 +266,13 @@ impl Project {
     }
 
     /// Pins the Yarn version in this project's manifest file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest cannot be updated or no Node is pinned.
     pub fn pin_yarn(&mut self, version: Option<Version>) -> Fallible<()> {
         if let Some(platform) = self.platform.as_mut() {
-            update_manifest(&self.manifest_file, ManifestKey::Yarn, version.as_ref())?;
+            update_manifest(&self.manifest_file, &ManifestKey::Yarn, version.as_ref())?;
 
             platform.yarn = version;
 
@@ -281,8 +321,8 @@ struct PartialPlatform {
 }
 
 impl PartialPlatform {
-    fn merge(self, other: PartialPlatform) -> PartialPlatform {
-        PartialPlatform {
+    fn merge(self, other: Self) -> Self {
+        Self {
             node: self.node.or(other.node),
             npm: self.npm.or(other.npm),
             pnpm: self.pnpm.or(other.pnpm),
@@ -294,10 +334,10 @@ impl PartialPlatform {
 impl TryFrom<PartialPlatform> for PlatformSpec {
     type Error = VoltaError;
 
-    fn try_from(partial: PartialPlatform) -> Fallible<PlatformSpec> {
+    fn try_from(partial: PartialPlatform) -> Fallible<Self> {
         let node = partial.node.ok_or(ErrorKind::NoProjectNodeInManifest)?;
 
-        Ok(PlatformSpec {
+        Ok(Self {
             node,
             npm: partial.npm,
             pnpm: partial.pnpm,

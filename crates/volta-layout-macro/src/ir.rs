@@ -21,7 +21,7 @@ use quote::{pounded_var_names, quote_each_token, quote_spanned};
 /// - Directories
 /// - Executable files
 /// - Other files
-pub(crate) struct Ir {
+pub struct Ir {
     pub(crate) name: Ident,
     pub(crate) attrs: Vec<Attribute>,
     pub(crate) visibility: Visibility,
@@ -78,6 +78,10 @@ impl Ir {
         quote! {
             impl #name {
                 /// Creates all subdirectories in this directory layout.
+                ///
+                /// # Errors
+                ///
+                /// Returns an error if any directory cannot be created.
                 pub fn create(&self) -> ::std::io::Result<()> {
                     #(::std::fs::create_dir_all(self.#dir_names())?;)*
                     ::std::result::Result::Ok(())
@@ -91,7 +95,7 @@ impl Ir {
 
         let methods = self.field_names().map(|field_name| {
             // Markdown-formatted field name for the doc comment.
-            let markdown_field_name = format!("`{}`", field_name);
+            let markdown_field_name = format!("`{field_name}`");
             let markdown_field_name = LitStr::new(&markdown_field_name, field_name.span());
 
             // Use the field name's span for good duplicate-method-name error messages.
@@ -99,6 +103,7 @@ impl Ir {
                 #[doc = "Returns the "]
                 #[doc = #markdown_field_name]
                 #[doc = " path."]
+                #[must_use]
                 pub fn #field_name(&self) -> &::std::path::Path { &self.#field_name }
             }
         });
@@ -107,7 +112,8 @@ impl Ir {
             impl #name {
                 #(#methods)*
 
-                 /// Returns the root path for this directory layout.
+                /// Returns the root path for this directory layout.
+                #[must_use]
                 pub fn root(&self) -> &::std::path::Path { &self.root }
             }
         }
@@ -129,7 +135,7 @@ impl Ir {
         let all_names = dir_names.chain(file_names).chain(exe_names);
         let all_inits = dir_inits.chain(file_inits).chain(exe_inits);
 
-        let markdown_struct_name = format!("`{}`", name);
+        let markdown_struct_name = format!("`{name}`");
         let markdown_struct_name = LitStr::new(&markdown_struct_name, name.span());
 
         quote! {
@@ -137,6 +143,7 @@ impl Ir {
                 #[doc = "Constructs a new instance of the "]
                 #[doc = #markdown_struct_name]
                 #[doc = " layout, rooted at `root`."]
+                #[must_use]
                 pub fn new(#root: ::std::path::PathBuf) -> Self {
                     Self {
                         #(#all_names: #all_inits),* ,
@@ -162,7 +169,7 @@ impl Ir {
     }
 }
 
-pub(crate) struct Entry {
+pub struct Entry {
     pub(crate) name: Ident,
     pub(crate) context: Vec<LitStr>,
     pub(crate) filename: LitStr,

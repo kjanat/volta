@@ -9,7 +9,7 @@ use crate::inventory::yarn_available;
 use crate::session::Session;
 use crate::style::tool_version;
 use crate::sync::VoltaLock;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 mod fetch;
 mod metadata;
@@ -23,19 +23,22 @@ pub struct Yarn {
 }
 
 impl Yarn {
-    pub fn new(version: Version) -> Self {
-        Yarn { version }
+    #[must_use] 
+    pub const fn new(version: Version) -> Self {
+        Self { version }
     }
 
+    #[must_use] 
     pub fn archive_basename(version: &str) -> String {
-        format!("yarn-v{}", version)
+        format!("yarn-v{version}")
     }
 
+    #[must_use] 
     pub fn archive_filename(version: &str) -> String {
-        format!("{}.tar.gz", Yarn::archive_basename(version))
+        format!("{}.tar.gz", Self::archive_basename(version))
     }
 
-    pub(crate) fn ensure_fetched(&self, session: &mut Session) -> Fallible<()> {
+    pub(crate) fn ensure_fetched(&self, session: &Session) -> Fallible<()> {
         match check_fetched(|| yarn_available(&self.version))? {
             FetchStatus::AlreadyFetched => {
                 debug_already_fetched(self);
@@ -65,11 +68,10 @@ impl Tool for Yarn {
         info_installed(&self);
         check_shim_reachable("yarn");
 
-        if let Ok(Some(project)) = session.project_platform() {
-            if let Some(yarn) = &project.yarn {
+        if let Ok(Some(project)) = session.project_platform()
+            && let Some(yarn) = &project.yarn {
                 info_project_version(tool_version("yarn", yarn), &self);
             }
-        }
         Ok(())
     }
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {

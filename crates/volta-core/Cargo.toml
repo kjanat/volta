@@ -1,58 +1,58 @@
 [package]
-name    = "volta-core"
-version = "0.1.0"
-edition = "2021"
+name                 = "volta-core"
+version              = "0.1.0"
+edition.workspace    = true
+repository.workspace = true
+license.workspace    = true
+readme.workspace     = true
+keywords.workspace   = true
+categories.workspace = true
+description          = "Core library for Volta JS toolchain manager"
 
 [dependencies]
-archive                   = { path = "../archive" }
-attohttpc                 = { version = "0.28", default-features = false, features = ["compress", "json", "tls-rustls-native-roots"] }
-cfg-if                    = "1.0"
-chain-map                 = "0.1.0"
-# We manually configure the feature list here because 0.4.16 includes the
-# `oldtime` feature by default to avoid a breaking change. Additionally, using
-# the feature list explicitly lets us drop the `wasmbind` feature, which we do
-# not need.
-chrono                    = { version = "0.4.39", default-features = false, features = ["alloc", "clock", "std"] }
-ci_info                   = "0.14.14"
-cmdline_words_parser      = "0.2.1"
-console                   = ">=0.11.3, <1.0.0"
-ctrlc                     = "3.4.5"
-detect-indent             = "0.1"
-dirs                      = "6.0.0"
-dunce                     = "1.0.5"
-envoy                     = "0.1.3"
-fs-utils                  = { path = "../fs-utils" }
-fs2                       = "0.4.3"
-headers                   = "0.4"
-httpdate                  = "1"
-indexmap                  = "2.7.0"
-indicatif                 = "0.17.9"
-log                       = { version = "0.4", features = ["std"] }
-mockito                   = { version = "0.31.1", optional = true }
-node-semver               = "2"
-once_cell                 = "1.19.0"
-os_info                   = "3.9.2"
-readext                   = "0.1.0"
-regex                     = "1.11.1"
-retry                     = "2"
-serde                     = { version = "1.0.217", features = ["derive"] }
-serde_json                = { version = "1.0.135", features = ["preserve_order"] }
-tempfile                  = "3.14.0"
-terminal_size             = "0.4.1"
-textwrap                  = "0.16.1"
-validate-npm-package-name = { path = "../validate-npm-package-name" }
-volta-layout              = { path = "../volta-layout" }
-walkdir                   = "2.5.0"
-which                     = "7.0.1"
+archive.workspace                   = true
+attohttpc.workspace                 = true
+cfg-if.workspace                    = true
+chain-map.workspace                 = true
+chrono.workspace                    = true
+cmdline_words_parser.workspace      = true
+console.workspace                   = true
+ctrlc.workspace                     = true
+detect-indent.workspace             = true
+dirs.workspace                      = true
+dunce.workspace                     = true
+envoy.workspace                     = true
+fs-utils.workspace                  = true
+fs2.workspace                       = true
+headers.workspace                   = true
+httpdate.workspace                  = true
+indexmap.workspace                  = true
+indicatif.workspace                 = true
+log.workspace                       = true
+mockito                             = { workspace = true, optional = true }
+nodejs-semver.workspace             = true
+once_cell.workspace                 = true
+os_info.workspace                   = true
+readext.workspace                   = true
+regex.workspace                     = true
+retry.workspace                     = true
+serde.workspace                     = true
+serde_json.workspace                = true
+tempfile.workspace                  = true
+terminal_size.workspace             = true
+textwrap.workspace                  = true
+validate-npm-package-name.workspace = true
+volta-layout.workspace              = true
+walkdir.workspace                   = true
+which.workspace                     = true
 
 [target.'cfg(windows)'.dependencies]
-junction = "1.2.0"
-winreg   = "0.55.0"
+junction.workspace = true
+winreg.workspace   = true
 
 [features]
-# The `cross-platform-docs` feature flag is used for generating API docs for
-# multiple platforms in one build.
-# See ci/publish-docs.yml for an example of how it's enabled.
-# See volta-core::path for an example of where it's used.
 cross-platform-docs = []
 mock-network        = ["mockito"]
+
+[lints]
+workspace = true

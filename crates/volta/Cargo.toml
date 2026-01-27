@@ -1,0 +1,57 @@
+[package]
+name                 = "volta"
+version.workspace    = true
+edition.workspace    = true
+repository.workspace = true
+license.workspace    = true
+readme.workspace     = true
+keywords.workspace   = true
+categories.workspace = true
+description          = "Volta: JS Toolchains as Code"
+
+[[bin]]
+name = "volta"
+path = "src/main.rs"
+
+[[bin]]
+name = "volta-shim"
+path = "src/volta-shim.rs"
+
+[[bin]]
+name = "volta-migrate"
+path = "src/volta-migrate.rs"
+
+[dependencies]
+clap.workspace          = true
+clap_complete.workspace = true
+dirs.workspace          = true
+log.workspace           = true
+mockito                 = { workspace = true, optional = true }
+nodejs-semver.workspace = true
+once_cell.workspace     = true
+serde.workspace         = true
+serde_json.workspace    = true
+textwrap.workspace      = true
+volta-core.workspace    = true
+volta-migrate.workspace = true
+which.workspace         = true
+
+[dev-dependencies]
+cfg-if.workspace       = true
+ci_info.workspace      = true
+envoy.workspace        = true
+hamcrest2.workspace    = true
+headers.workspace      = true
+test-support.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winreg.workspace = true
+
+[features]
+cross-platform-docs = ["volta-core/cross-platform-docs"]
+mock-network        = ["mockito", "volta-core/mock-network"]
+smoke-tests         = []
+volta-dev           = []
+
+[lints]
+workspace = true

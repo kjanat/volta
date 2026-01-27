@@ -2,10 +2,21 @@ use crate::ir::{Entry, Ir};
 use proc_macro2::TokenStream;
 use std::collections::HashMap;
 use syn::parse::{self, Parse, ParseStream};
-use syn::punctuated::Punctuated;
 use syn::{braced, Attribute, Ident, LitStr, Token, Visibility};
 
-pub(crate) type Result<T> = ::std::result::Result<T, TokenStream>;
+pub type Result<T> = ::std::result::Result<T, TokenStream>;
+
+/// Check if filename has .exe extension (case-insensitive for DSL validation).
+fn has_exe_extension(filename: &str) -> bool {
+    filename
+        .rsplit_once('.')
+        .is_some_and(|(_, ext)| ext.eq_ignore_ascii_case("exe"))
+}
+
+/// Check if filename has [.exe] suffix (conditional exe marker).
+fn has_conditional_exe_suffix(filename: &str) -> bool {
+    filename.ends_with("[.exe]")
+}
 
 /// Abstract syntax tree (AST) for the surface syntax of the `layout!` macro.
 ///
@@ -17,7 +28,7 @@ pub(crate) type Result<T> = ::std::result::Result<T, TokenStream>;
 ///
 /// This AST gets lowered by the `flatten` method to a vector of intermediate
 /// representation (IR) trees. See the `Ir` type for details.
-pub(crate) struct Ast {
+pub struct Ast {
     decls: Vec<LayoutStruct>,
 }
 
@@ -28,7 +39,7 @@ impl Parse for Ast {
             let decl = input.call(LayoutStruct::parse)?;
             decls.push(decl);
         }
-        Ok(Ast { decls })
+        Ok(Self { decls })
     }
 }
 
@@ -45,7 +56,7 @@ impl Ast {
     }
 }
 
-/// Represents a single type LayoutStruct in the AST, which takes the form:
+/// Represents a single type `LayoutStruct` in the AST, which takes the form:
 ///
 /// ```text,no_run
 /// Attribute* Visibility "struct" Ident Directory
@@ -53,7 +64,7 @@ impl Ast {
 ///
 /// This AST gets lowered by the `flatten` method to a flat list of entries,
 /// organized by entry type. See the `Ir` type for details.
-pub(crate) struct LayoutStruct {
+pub struct LayoutStruct {
     attrs: Vec<Attribute>,
     visibility: Visibility,
     name: Ident,
@@ -67,7 +78,7 @@ impl Parse for LayoutStruct {
         input.parse::<Token![struct]>()?;
         let name: Ident = input.parse()?;
         let directory: Directory = input.parse()?;
-        Ok(LayoutStruct {
+        Ok(Self {
             attrs,
             visibility,
             name,
@@ -88,7 +99,7 @@ impl LayoutStruct {
             exes: vec![],
         };
 
-        self.directory.flatten(&mut results, vec![])?;
+        self.directory.flatten(&mut results, &[])?;
 
         Ok(results)
     }
@@ -105,16 +116,20 @@ impl LayoutStruct {
 /// }
 /// ```
 struct Directory {
-    entries: Punctuated<FieldPrefix, FieldContents>,
+    entries: Vec<(FieldPrefix, FieldContents)>,
 }
 
 impl Parse for Directory {
     fn parse(input: ParseStream) -> parse::Result<Self> {
         let content;
         braced!(content in input);
-        Ok(Directory {
-            entries: content.parse_terminated(FieldPrefix::parse)?,
-        })
+        let mut entries = Vec::new();
+        while !content.is_empty() {
+            let prefix: FieldPrefix = content.parse()?;
+            let contents: FieldContents = content.parse()?;
+            entries.push((prefix, contents));
+        }
+        Ok(Self { entries })
     }
 }
 
@@ -126,23 +141,21 @@ enum EntryKind {
 
 impl Directory {
     /// Lowers the directory to a flattened intermediate representation.
-    fn flatten(self, results: &mut Ir, context: Vec<LitStr>) -> Result<()> {
+    fn flatten(self, results: &mut Ir, context: &[LitStr]) -> Result<()> {
         let mut visited_entries = HashMap::new();
 
-        for pair in self.entries.into_pairs() {
-            let (prefix, punc) = pair.into_tuple();
-
+        for (prefix, contents) in self.entries {
             let mut entry = Entry {
                 name: prefix.name,
-                context: context.clone(),
+                context: context.to_owned(),
                 filename: prefix.filename.clone(),
             };
 
-            match punc {
-                Some(FieldContents::Dir(dir)) => {
-                    let filename = prefix.filename.value();
+            let filename = prefix.filename.value();
 
-                    if filename.ends_with(".exe") || filename.ends_with("[.exe]") {
+            match contents {
+                FieldContents::Dir(dir) => {
+                    if has_exe_extension(&filename) || has_conditional_exe_suffix(&filename) {
                         let error = syn::Error::new(
                             prefix.filename.span(),
                             "the `.exe` extension is not allowed for directory names",
@@ -153,10 +166,10 @@ impl Directory {
                     if let Some(kind) = visited_entries.get(&filename) {
                         let message = match kind {
                             EntryKind::Exe => {
-                                format!("filename `{}` is a duplicate of `{}` executable on non-Windows operating systems", filename, filename)
+                                format!("filename `{filename}` is a duplicate of `{filename}` executable on non-Windows operating systems")
                             }
-                            _ => {
-                                format!("duplicate filename `{}`", filename)
+                            EntryKind::File | EntryKind::Dir => {
+                                format!("duplicate filename `{filename}`")
                             }
                         };
                         let error = syn::Error::new(prefix.filename.span(), message);
@@ -166,42 +179,41 @@ impl Directory {
                     visited_entries.insert(filename.clone(), EntryKind::Dir);
 
                     results.dirs.push(entry);
-                    let mut sub_context = context.clone();
+                    let mut sub_context = context.to_owned();
                     sub_context.push(prefix.filename);
-                    dir.flatten(results, sub_context)?;
+                    dir.flatten(results, &sub_context)?;
                 }
-                _ => {
-                    let filename = prefix.filename.value();
-                    if filename.ends_with("[.exe]") {
-                        let filename = &filename[0..filename.len() - 6];
+                FieldContents::File(()) => {
+                    if has_conditional_exe_suffix(&filename) {
+                        let basename = &filename[0..filename.len() - 6];
 
-                        if let Some(kind) = visited_entries.get(filename) {
+                        if let Some(kind) = visited_entries.get(basename) {
                             let message = match kind {
                                 EntryKind::Exe => {
-                                    format!("duplicate filename `{}.exe`", filename)
+                                    format!("duplicate filename `{basename}.exe`")
                                 }
                                 EntryKind::File => {
-                                    format!("executable `{}` (on non-Windows operating systems) is a duplicate of `{}` filename", filename, filename)
+                                    format!("executable `{basename}` (on non-Windows operating systems) is a duplicate of `{basename}` filename")
                                 }
                                 EntryKind::Dir => {
-                                    format!("executable `{}` (on non-Windows operating systems) is a duplicate of `{}` directory name", filename, filename)
+                                    format!("executable `{basename}` (on non-Windows operating systems) is a duplicate of `{basename}` directory name")
                                 }
                             };
                             let error = syn::Error::new(prefix.filename.span(), message);
                             return Err(error.to_compile_error());
                         }
 
-                        visited_entries.insert(filename.to_string(), EntryKind::Exe);
-                        entry.filename = LitStr::new(filename, prefix.filename.span());
+                        visited_entries.insert(basename.to_string(), EntryKind::Exe);
+                        entry.filename = LitStr::new(basename, prefix.filename.span());
                         results.exes.push(entry);
                     } else {
                         if let Some(kind) = visited_entries.get(&filename) {
                             let message = match kind {
                                 EntryKind::Exe => {
-                                    format!("filename `{}` is a duplicate of `{}` executable on non-Windows operating systems", filename, filename)
+                                    format!("filename `{filename}` is a duplicate of `{filename}` executable on non-Windows operating systems")
                                 }
-                                _ => {
-                                    format!("duplicate filename `{}`", filename)
+                                EntryKind::File | EntryKind::Dir => {
+                                    format!("duplicate filename `{filename}`")
                                 }
                             };
                             let error = syn::Error::new(prefix.filename.span(), message);
@@ -241,14 +253,14 @@ impl Parse for FieldPrefix {
         let filename = input.parse()?;
         input.parse::<Token![:]>()?;
         let name = input.parse()?;
-        Ok(FieldPrefix { filename, name })
+        Ok(Self { filename, name })
     }
 }
 
 /// AST for the suffix of a field in a `layout!` struct declaration.
 enum FieldContents {
     /// A file field suffix, which consists of a single semicolon (`;`).
-    File(Token![;]),
+    File(()),
 
     /// A directory field suffix, which consists of a braced directory.
     Dir(Directory),
@@ -258,11 +270,11 @@ impl Parse for FieldContents {
     fn parse(input: ParseStream) -> parse::Result<Self> {
         let lookahead = input.lookahead1();
         Ok(if lookahead.peek(Token![;]) {
-            let semi = input.parse()?;
-            FieldContents::File(semi)
+            let _semi: Token![;] = input.parse()?;
+            Self::File(())
         } else {
             let directory = input.parse()?;
-            FieldContents::Dir(directory)
+            Self::Dir(directory)
         })
     }
 }

@@ -1,19 +1,22 @@
 use log::debug;
-use node_semver::{Range, Version};
+use nodejs_semver::{Range, Version};
 
 use crate::error::{ErrorKind, Fallible};
 use crate::hook::ToolHooks;
 use crate::session::Session;
 use crate::tool::registry::{fetch_npm_registry, public_registry_index, PackageIndex};
 use crate::tool::{PackageDetails, Pnpm};
-use crate::version::{VersionSpec, VersionTag};
+use crate::version::{VersionSpec, Tag};
 
+/// # Errors
+///
+/// Returns an error if the version cannot be resolved.
 pub fn resolve(matching: VersionSpec, session: &mut Session) -> Fallible<Version> {
     let hooks = session.hooks()?.pnpm();
     match matching {
-        VersionSpec::Semver(requirement) => resolve_semver(requirement, hooks),
+        VersionSpec::Semver(requirement) => resolve_semver(&requirement, hooks),
         VersionSpec::Exact(version) => Ok(version),
-        VersionSpec::None | VersionSpec::Tag(VersionTag::Latest) => resolve_tag("latest", hooks),
+        VersionSpec::None | VersionSpec::Tag(Tag::Latest) => resolve_tag("latest", hooks),
         VersionSpec::Tag(tag) => resolve_tag(&tag.to_string(), hooks),
     }
 }
@@ -21,19 +24,21 @@ pub fn resolve(matching: VersionSpec, session: &mut Session) -> Fallible<Version
 fn resolve_tag(tag: &str, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible<Version> {
     let (url, mut index) = fetch_pnpm_index(hooks)?;
 
-    match index.tags.remove(tag) {
-        Some(version) => {
-            debug!("Found pnpm@{} matching tag '{}' from {}", version, tag, url);
+    index.tags.remove(tag).map_or_else(
+        || {
+            Err(ErrorKind::PnpmVersionNotFound {
+                matching: tag.into(),
+            }
+            .into())
+        },
+        |version| {
+            debug!("Found pnpm@{version} matching tag '{tag}' from {url}");
             Ok(version)
-        }
-        None => Err(ErrorKind::PnpmVersionNotFound {
-            matching: tag.into(),
-        }
-        .into()),
-    }
+        },
+    )
 }
 
-fn resolve_semver(matching: Range, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible<Version> {
+fn resolve_semver(matching: &Range, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible<Version> {
     let (url, index) = fetch_pnpm_index(hooks)?;
 
     let details_opt = index

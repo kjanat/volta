@@ -13,11 +13,13 @@ pub const MAX_WIDTH: usize = 100;
 const MAX_PROGRESS_WIDTH: usize = 40;
 
 /// Generate the styled prefix for a success message
+#[must_use]
 pub fn success_prefix() -> StyledObject<&'static str> {
     style("success:").green().bold()
 }
 
 /// Generate the styled prefix for a note
+#[must_use]
 pub fn note_prefix() -> StyledObject<&'static str> {
     style("   note:").magenta().bold()
 }
@@ -33,7 +35,7 @@ pub(crate) fn format_error_cause(inner: &dyn Error) -> String {
 }
 
 /// Determines the string to display based on the Origin of the operation.
-fn action_str(origin: Origin) -> &'static str {
+const fn action_str(origin: Origin) -> &'static str {
     match origin {
         Origin::Local => "Unpacking",
         Origin::Remote => "Fetching",
@@ -45,18 +47,25 @@ where
     N: std::fmt::Display + Sized,
     V: std::fmt::Display + Sized,
 {
-    format!("{:}@{:}", name, version)
+    format!("{name:}@{version:}")
 }
 
-/// Get the width of the terminal, limited to a maximum of MAX_WIDTH
+/// Get the width of the terminal, limited to a maximum of `MAX_WIDTH`
+#[must_use]
 pub fn text_width() -> Option<usize> {
     terminal_size().map(|(Width(w), _)| (w as usize).min(MAX_WIDTH))
 }
 
-/// Constructs a command-line progress bar based on the specified Origin enum
-/// (e.g., `Origin::Remote`), details string (e.g., `"v1.23.4"`), and logical
-/// length (i.e., the number of logical progress steps in the process being
-/// visualized by the progress bar).
+/// Constructs a command-line progress bar.
+///
+/// Based on the specified Origin enum (e.g., `Origin::Remote`), details string
+/// (e.g., `"v1.23.4"`), and logical length (i.e., the number of logical progress
+/// steps in the process being visualized by the progress bar).
+///
+/// # Panics
+///
+/// Panics if the progress bar template is invalid (should not happen with hardcoded template).
+#[must_use]
 pub fn progress_bar(origin: Origin, details: &str, len: u64) -> ProgressBar {
     let action = action_str(origin);
     let action_width = action.len() + 2; // plus 2 spaces to look nice
@@ -65,10 +74,9 @@ pub fn progress_bar(origin: Origin, details: &str, len: u64) -> ProgressBar {
     //   Fetching node@9.11.2  [=============>                          ]  34%
     // |--------| |---------|   |--------------------------------------|  |-|
     //    action    details                      bar                 percentage
-    let bar_width = match text_width() {
-        Some(width) => MAX_PROGRESS_WIDTH.min(width - 2 - msg_width - 2 - 2 - 1 - 3 - 1),
-        None => MAX_PROGRESS_WIDTH,
-    };
+    let bar_width = text_width().map_or(MAX_PROGRESS_WIDTH, |width| {
+        MAX_PROGRESS_WIDTH.min(width - 2 - msg_width - 2 - 2 - 1 - 3 - 1)
+    });
 
     let progress = ProgressBar::new(len);
 
@@ -81,8 +89,7 @@ pub fn progress_bar(origin: Origin, details: &str, len: u64) -> ProgressBar {
     progress.set_style(
         ProgressStyle::default_bar()
             .template(&format!(
-                "{{msg}}  [{{bar:{}.cyan/blue}}] {{percent:>3}}%",
-                bar_width
+                "{{msg}}  [{{bar:{bar_width}.cyan/blue}}] {{percent:>3}}%"
             ))
             .expect("template is valid")
             .progress_chars("=> "),

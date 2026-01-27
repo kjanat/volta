@@ -15,7 +15,7 @@ use crate::session::ActivityKind;
 pub struct Event {
     timestamp: u64,
     pub name: String,
-    pub event: EventKind,
+    pub event: Kind,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug)]
@@ -29,7 +29,7 @@ pub struct ErrorEnv {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "lowercase")]
-pub enum EventKind {
+pub enum Kind {
     Start,
     End {
         exit_code: i32,
@@ -47,7 +47,8 @@ pub enum EventKind {
     },
 }
 
-impl EventKind {
+impl Kind {
+    #[must_use] 
     pub fn into_event(self, activity_kind: ActivityKind) -> Event {
         Event {
             timestamp: unix_timestamp(),
@@ -63,7 +64,7 @@ fn unix_timestamp() -> u64 {
     let duration = start
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
-    let nanosecs_since_epoch = duration.as_secs() * 1_000_000_000 + duration.subsec_nanos() as u64;
+    let nanosecs_since_epoch = duration.as_secs() * 1_000_000_000 + u64::from(duration.subsec_nanos());
     nanosecs_since_epoch / 1_000_000
 }
 
@@ -91,39 +92,40 @@ fn get_error_env() -> ErrorEnv {
     }
 }
 
-pub struct EventLog {
+pub struct Log {
     events: Vec<Event>,
 }
 
-impl EventLog {
-    /// Constructs a new 'EventLog'
-    pub fn init() -> Self {
-        EventLog { events: Vec::new() }
+impl Log {
+    /// Constructs a new '`EventLog`'
+    #[must_use] 
+    pub const fn init() -> Self {
+        Self { events: Vec::new() }
     }
 
     pub fn add_event_start(&mut self, activity_kind: ActivityKind) {
-        self.add_event(EventKind::Start, activity_kind)
+        self.add_event(Kind::Start, activity_kind);
     }
     pub fn add_event_end(&mut self, activity_kind: ActivityKind, exit_code: ExitCode) {
         self.add_event(
-            EventKind::End {
+            Kind::End {
                 exit_code: exit_code as i32,
             },
             activity_kind,
-        )
+        );
     }
     pub fn add_event_tool_end(&mut self, activity_kind: ActivityKind, exit_code: i32) {
-        self.add_event(EventKind::ToolEnd { exit_code }, activity_kind)
+        self.add_event(Kind::ToolEnd { exit_code }, activity_kind);
     }
     pub fn add_event_error(&mut self, activity_kind: ActivityKind, error: &VoltaError) {
         self.add_event(
-            EventKind::Error {
+            Kind::Error {
                 exit_code: error.exit_code() as i32,
                 error: error.to_string(),
                 env: get_error_env(),
             },
             activity_kind,
-        )
+        );
     }
     pub fn add_event_args(&mut self) {
         let argv = env::args_os()
@@ -135,10 +137,10 @@ impl EventLog {
                 result.push_str(&arg.to_string_lossy());
                 result
             });
-        self.add_event(EventKind::Args { argv }, ActivityKind::Args)
+        self.add_event(Kind::Args { argv }, ActivityKind::Args);
     }
 
-    fn add_event(&mut self, event_kind: EventKind, activity_kind: ActivityKind) {
+    fn add_event(&mut self, event_kind: Kind, activity_kind: ActivityKind) {
         let event = event_kind.into_event(activity_kind);
         self.events.push(event);
     }
@@ -158,32 +160,32 @@ impl EventLog {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{EventKind, EventLog};
+    use super::{Kind, Log};
     use crate::error::{ErrorKind, ExitCode};
     use crate::session::ActivityKind;
     use regex::Regex;
 
     #[test]
     fn test_adding_events() {
-        let mut event_log = EventLog::init();
+        let mut event_log = Log::init();
         assert_eq!(event_log.events.len(), 0);
 
         event_log.add_event_start(ActivityKind::Current);
         assert_eq!(event_log.events.len(), 1);
         assert_eq!(event_log.events[0].name, "current");
-        assert_eq!(event_log.events[0].event, EventKind::Start);
+        assert_eq!(event_log.events[0].event, Kind::Start);
 
         event_log.add_event_end(ActivityKind::Pin, ExitCode::NetworkError);
         assert_eq!(event_log.events.len(), 2);
         assert_eq!(event_log.events[1].name, "pin");
-        assert_eq!(event_log.events[1].event, EventKind::End { exit_code: 5 });
+        assert_eq!(event_log.events[1].event, Kind::End { exit_code: 5 });
 
         event_log.add_event_tool_end(ActivityKind::Version, 12);
         assert_eq!(event_log.events.len(), 3);
         assert_eq!(event_log.events[2].name, "version");
         assert_eq!(
             event_log.events[2].event,
-            EventKind::ToolEnd { exit_code: 12 }
+            Kind::ToolEnd { exit_code: 12 }
         );
 
         let error = ErrorKind::BinaryExecError.into();
@@ -196,7 +198,7 @@ pub mod tests {
         assert_eq!(event_log.events.len(), 5);
         assert_eq!(event_log.events[4].name, "args");
         match event_log.events[4].event {
-            EventKind::Args { ref argv } => {
+            Kind::Args { ref argv } => {
                 let re = Regex::new("volta_core").unwrap();
                 assert!(re.is_match(argv));
             }

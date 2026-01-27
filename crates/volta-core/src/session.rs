@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Formatter};
 use std::process::exit;
 
 use crate::error::{ExitCode, Fallible, VoltaError};
-use crate::event::EventLog;
+use crate::event::Log;
 use crate::hook::{HookConfig, LazyHookConfig};
 use crate::platform::PlatformSpec;
 use crate::project::{LazyProject, Project};
@@ -43,29 +43,29 @@ pub enum ActivityKind {
 impl Display for ActivityKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         let s = match self {
-            ActivityKind::Fetch => "fetch",
-            ActivityKind::Install => "install",
-            ActivityKind::Uninstall => "uninstall",
-            ActivityKind::List => "list",
-            ActivityKind::Current => "current",
-            ActivityKind::Default => "default",
-            ActivityKind::Pin => "pin",
-            ActivityKind::Node => "node",
-            ActivityKind::Npm => "npm",
-            ActivityKind::Npx => "npx",
-            ActivityKind::Pnpm => "pnpm",
-            ActivityKind::Yarn => "yarn",
-            ActivityKind::Volta => "volta",
-            ActivityKind::Tool => "tool",
-            ActivityKind::Help => "help",
-            ActivityKind::Version => "version",
-            ActivityKind::Binary => "binary",
-            ActivityKind::Setup => "setup",
-            ActivityKind::Shim => "shim",
-            ActivityKind::Completions => "completions",
-            ActivityKind::Which => "which",
-            ActivityKind::Run => "run",
-            ActivityKind::Args => "args",
+            Self::Fetch => "fetch",
+            Self::Install => "install",
+            Self::Uninstall => "uninstall",
+            Self::List => "list",
+            Self::Current => "current",
+            Self::Default => "default",
+            Self::Pin => "pin",
+            Self::Node => "node",
+            Self::Npm => "npm",
+            Self::Npx => "npx",
+            Self::Pnpm => "pnpm",
+            Self::Yarn => "yarn",
+            Self::Volta => "volta",
+            Self::Tool => "tool",
+            Self::Help => "help",
+            Self::Version => "version",
+            Self::Binary => "binary",
+            Self::Setup => "setup",
+            Self::Shim => "shim",
+            Self::Completions => "completions",
+            Self::Which => "which",
+            Self::Run => "run",
+            Self::Args => "args",
         };
         f.write_str(s)
     }
@@ -83,36 +83,53 @@ pub struct Session {
     hooks: LazyHookConfig,
     toolchain: LazyToolchain,
     project: LazyProject,
-    event_log: EventLog,
+    event_log: Log,
 }
 
 impl Session {
     /// Constructs a new `Session`.
-    pub fn init() -> Session {
-        Session {
+    #[must_use]
+    pub const fn init() -> Self {
+        Self {
             hooks: LazyHookConfig::init(),
             toolchain: LazyToolchain::init(),
             project: LazyProject::init(),
-            event_log: EventLog::init(),
+            event_log: Log::init(),
         }
     }
 
     /// Produces a reference to the current Node project, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the project cannot be loaded.
     pub fn project(&self) -> Fallible<Option<&Project>> {
         self.project.get()
     }
 
     /// Produces a mutable reference to the current Node project, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the project cannot be loaded.
     pub fn project_mut(&mut self) -> Fallible<Option<&mut Project>> {
         self.project.get_mut()
     }
 
     /// Returns the user's default platform, if any
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the toolchain cannot be loaded.
     pub fn default_platform(&self) -> Fallible<Option<&PlatformSpec>> {
         self.toolchain.get().map(Toolchain::platform)
     }
 
     /// Returns the current project's pinned platform image, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the project cannot be loaded.
     pub fn project_platform(&self) -> Fallible<Option<&PlatformSpec>> {
         if let Some(project) = self.project()? {
             return Ok(project.platform());
@@ -121,31 +138,43 @@ impl Session {
     }
 
     /// Produces a reference to the current toolchain (default platform specification)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the toolchain cannot be loaded.
     pub fn toolchain(&self) -> Fallible<&Toolchain> {
         self.toolchain.get()
     }
 
     /// Produces a mutable reference to the current toolchain
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the toolchain cannot be loaded.
     pub fn toolchain_mut(&mut self) -> Fallible<&mut Toolchain> {
         self.toolchain.get_mut()
     }
 
     /// Produces a reference to the hook configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hooks cannot be loaded.
     pub fn hooks(&self) -> Fallible<&HookConfig> {
         self.hooks.get(self.project()?)
     }
 
     pub fn add_event_start(&mut self, activity_kind: ActivityKind) {
-        self.event_log.add_event_start(activity_kind)
+        self.event_log.add_event_start(activity_kind);
     }
     pub fn add_event_end(&mut self, activity_kind: ActivityKind, exit_code: ExitCode) {
-        self.event_log.add_event_end(activity_kind, exit_code)
+        self.event_log.add_event_end(activity_kind, exit_code);
     }
     pub fn add_event_tool_end(&mut self, activity_kind: ActivityKind, exit_code: i32) {
-        self.event_log.add_event_tool_end(activity_kind, exit_code)
+        self.event_log.add_event_tool_end(activity_kind, exit_code);
     }
     pub fn add_event_error(&mut self, activity_kind: ActivityKind, error: &VoltaError) {
-        self.event_log.add_event_error(activity_kind, error)
+        self.event_log.add_event_error(activity_kind, error);
     }
 
     fn publish_to_event_log(self) {
@@ -165,7 +194,7 @@ impl Session {
                 event_log.publish(plugin);
             }
             Err(e) => {
-                debug!("Unable to publish event log.\n{}", e);
+                debug!("Unable to publish event log.\n{e}");
             }
         }
     }

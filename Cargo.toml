@@ -3,46 +3,111 @@ resolver = "3"
 members  = ["crates/*"]
 
 [workspace.package]
-version    = "2.0.2"
-edition    = "2024"
-repository = "https://github.com/kjanat/volta"
-license    = "BSD-2-Clause"
+version     = "2.0.2"
+edition     = "2024"
+repository  = "https://github.com/kjanat/volta"
+license     = "BSD-2-Clause"
+readme      = "README.md"
+keywords    = ["node", "npm", "yarn", "pnpm", "volta"]
+categories  = ["command-line-utilities", "development-tools"]
 
 [workspace.lints.clippy]
-# Touch these and you'll die. Mostly here to stop ai agents from adding allow comments everywhere...
-branches_sharing_code                     = "forbid"
+# Use deny not forbid - clap derive macros generate #[allow(clippy::*)] that conflicts with forbid
+branches_sharing_code                     = "deny"
 cargo                                     = { level = "warn", priority = -1 }
 cargo_common_metadata                     = "deny"
-case_sensitive_file_extension_comparisons = "forbid"
+case_sensitive_file_extension_comparisons = "deny"
 doc_markdown                              = "deny"
 fallible_impl_from                        = "deny"
 items_after_statements                    = "deny"
 manual_let_else                           = "deny"
-match_same_arms                           = "forbid"
-missing_panics_doc                        = "forbid"
-module_name_repetitions                   = "forbid"
-multiple_crate_versions                   = "deny"
+match_same_arms                           = "deny"
+missing_panics_doc                        = "deny"
+module_name_repetitions                   = "deny"
+multiple_crate_versions                   = "allow"  # transitive deps, unfixable
+
 needless_pass_by_ref_mut                  = "deny"
 needless_pass_by_value                    = "deny"
 nursery                                   = { level = "warn", priority = -1 }
-option_if_let_else                        = "forbid"
-option_map_or_none                        = "forbid"
+option_if_let_else                        = "deny"
+option_map_or_none                        = "deny"
 or_fun_call                               = "deny"
 pedantic                                  = { level = "warn", priority = -1 }
-redundant_pub_crate                       = "forbid"
+redundant_pub_crate                       = "deny"
 ref_option                                = "deny"
-should_implement_trait                    = "forbid"
+should_implement_trait                    = "deny"
 significant_drop_tightening               = "deny"
-struct_excessive_bools                    = "deny"
-struct_field_names                        = "forbid"
-too_long_first_doc_paragraph              = "forbid"
+struct_excessive_bools                    = "warn"  # CLI structs legitimately have many bool flags
+struct_field_names                        = "deny"
+too_long_first_doc_paragraph              = "deny"
 too_many_lines                            = "warn"
 unnecessary_debug_formatting              = "deny"
 unused_self                               = "deny"
-used_underscore_items                     = "forbid"
+used_underscore_items                     = "deny"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
+
+[workspace.dependencies]
+# Internal crates
+archive                   = { path = "crates/archive" }
+fs-utils                  = { path = "crates/fs-utils" }
+progress-read             = { path = "crates/progress-read" }
+test-support              = { path = "crates/test-support" }
+validate-npm-package-name = { path = "crates/validate-npm-package-name" }
+volta-core                = { path = "crates/volta-core" }
+volta-layout              = { path = "crates/volta-layout" }
+volta-layout-macro        = { path = "crates/volta-layout-macro" }
+volta-migrate             = { path = "crates/volta-migrate" }
+
+# External crates
+attohttpc            = { version = "0.30", default-features = false, features = ["compress", "json", "tls-rustls-native-roots"] }
+cfg-if               = "1"
+chain-map            = "0.1"
+chrono               = { version = "0.4", default-features = false, features = ["alloc", "clock", "std"] }
+ci_info              = "0.14"
+clap                 = { version = "4.5", features = ["color", "derive", "wrap_help"] }
+clap_complete        = "4.5"
+cmdline_words_parser = "0.2"
+console              = "0.16"
+ctrlc                = "3.4"
+detect-indent        = "0.1"
+dirs                 = "6"
+dunce                = "1"
+envoy                = "0.1"
+flate2               = "1"
+fs2                  = "0.4"
+hamcrest2            = "0.3"
+headers              = "0.4"
+httpdate             = "1"
+indexmap             = "2"
+indicatif            = "0.18"
+junction             = "1"
+log                  = { version = "0.4", features = ["std"] }
+mockito              = "1"
+nodejs-semver        = "4"
+once_cell            = "1"
+os_info              = "3"
+percent-encoding     = "2"
+proc-macro2          = "1"
+quote                = "1"
+readext              = "0.1"
+regex                = "1"
+retry                = "2"
+serde                = { version = "1", features = ["derive"] }
+serde_json           = { version = "1", features = ["preserve_order"] }
+syn                  = "2"
+tar                  = "0.4"
+tee                  = "0.1"
+tempfile             = "3"
+terminal_size        = "0.4"
+textwrap             = "0.16"
+thiserror            = "2"
+verbatim             = "0.1"
+walkdir              = "2"
+which                = "8"
+winreg               = "0.55"
+zip                  = { version = "7", default-features = false, features = ["bzip2", "deflate"] }
 
 [profile.release]
 lto           = "fat"

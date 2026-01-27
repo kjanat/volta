@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 
 use super::PartialPlatform;
 use crate::error::{Context, ErrorKind, Fallible};
-use crate::version::parse_version;
+use crate::version::parse;
 use dunce::canonicalize;
-use node_semver::Version;
+use nodejs_semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -49,7 +49,7 @@ impl Manifest {
             None => (None, None),
         };
 
-        Ok(Manifest {
+        Ok(Self {
             dependency_maps,
             platform,
             extends,
@@ -67,10 +67,10 @@ pub(super) enum ManifestKey {
 impl fmt::Display for ManifestKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            ManifestKey::Node => "node",
-            ManifestKey::Npm => "npm",
-            ManifestKey::Pnpm => "pnpm",
-            ManifestKey::Yarn => "yarn",
+            Self::Node => "node",
+            Self::Npm => "npm",
+            Self::Pnpm => "pnpm",
+            Self::Yarn => "yarn",
         })
     }
 }
@@ -82,7 +82,7 @@ impl fmt::Display for ManifestKey {
 /// If the value is `None`, will remove the key from the hash
 pub(super) fn update_manifest(
     file: &Path,
-    key: ManifestKey,
+    key: &ManifestKey,
     value: Option<&Version>,
 ) -> Fallible<()> {
     let contents = read_to_string(file).with_context(|| ErrorKind::PackageReadError {
@@ -177,10 +177,10 @@ struct ToolchainSpec {
 impl ToolchainSpec {
     /// Moves the tool versions into a `PartialPlatform` and returns that along with the `extends` value
     fn parse_split(self) -> Fallible<(PartialPlatform, Option<PathBuf>)> {
-        let node = self.node.map(parse_version).transpose()?;
-        let npm = self.npm.map(parse_version).transpose()?;
-        let pnpm = self.pnpm.map(parse_version).transpose()?;
-        let yarn = self.yarn.map(parse_version).transpose()?;
+        let node = self.node.map(parse).transpose()?;
+        let npm = self.npm.map(parse).transpose()?;
+        let pnpm = self.pnpm.map(parse).transpose()?;
+        let yarn = self.yarn.map(parse).transpose()?;
 
         let platform = PartialPlatform {
             node,

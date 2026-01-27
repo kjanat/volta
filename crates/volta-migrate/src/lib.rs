@@ -34,7 +34,8 @@ use volta_core::sync::VoltaLock;
 /// Represents the state of the Volta directory at every point in the migration process
 ///
 /// Migrations should be applied sequentially, migrating from V0 to V1 to ... as needed, cycling
-/// through the possible MigrationState values.
+/// through the possible `MigrationState` values.
+#[allow(dead_code)] // V4 inner value unused; terminal state
 enum MigrationState {
     Empty(empty::Empty),
     V0(Box<V0>),
@@ -54,7 +55,7 @@ enum MigrationState {
 ///
 /// The tuples should be in reverse chronological order, so that the newest is first, e.g.:
 ///
-/// detect_tagged!((v3, V3, V3), (v2, V2, V2), (v1, V1, V1));
+/// `detect_tagged!((v3`, V3, V3), (v2, V2, V2), (v1, V1, V1));
 macro_rules! detect_tagged {
     ($(($layout:ident, $variant:ident, $migration:ident)),*) => {
         impl MigrationState {
@@ -68,7 +69,7 @@ macro_rules! detect_tagged {
 
         mod detect {
             $(
-                pub(super) fn $layout(home: &::std::path::Path) -> Option<super::MigrationState> {
+                pub fn $layout(home: &::std::path::Path) -> Option<super::MigrationState> {
                     let volta_home = volta_layout::$layout::VoltaHome::new(home.to_owned());
                     if volta_home.layout_file().exists() {
                         Some(super::MigrationState::$variant(Box::new(super::$migration::new(home.to_owned()))))
@@ -90,10 +91,8 @@ impl MigrationState {
 
         let home = volta_home()?;
 
-        match MigrationState::detect_tagged_state(home.root()) {
-            Some(state) => Ok(state),
-            None => MigrationState::detect_legacy_state(home.root()),
-        }
+        Self::detect_tagged_state(home.root())
+            .map_or_else(|| Self::detect_legacy_state(home.root()), Ok)
     }
 
     #[allow(clippy::unnecessary_wraps)] // Needs to be Fallible for Unix
@@ -125,32 +124,29 @@ impl MigrationState {
                 if install.root().starts_with(&volta_home) {
                     // Installed inside $VOLTA_HOME, so need to look for `load.sh` as a marker
                     if volta_home.join("load.sh").exists() {
-                        return Ok(MigrationState::V0(Box::new(V0::new(volta_home))));
+                        return Ok(Self::V0(Box::new(V0::new(volta_home))));
                     }
                 } else {
                     // Installed outside of $VOLTA_HOME, so it must exist from a previous V0 install
-                    return Ok(MigrationState::V0(Box::new(V0::new(volta_home))));
+                    return Ok(Self::V0(Box::new(V0::new(volta_home))));
                 }
             }
         }
 
-        Ok(MigrationState::Empty(empty::Empty::new(volta_home)))
+        Ok(Self::Empty(empty::Empty::new(volta_home)))
     }
 }
 
+/// # Errors
+///
+/// Returns an error if the migration fails.
 pub fn run_migration() -> Fallible<()> {
     // Acquire an exclusive lock on the Volta directory, to ensure that no other migrations are running.
     // If this fails, however, we still need to run the migration
-    match VoltaLock::acquire() {
-        Ok(_lock) => {
-            // The lock was acquired, so we can be confident that no other migrations are running
-            detect_and_migrate()
-        }
-        Err(_) => {
-            debug!("Unable to acquire lock on Volta directory! Running migration anyway.");
-            detect_and_migrate()
-        }
-    }
+    let _lock = VoltaLock::acquire().inspect_err(|_| {
+        debug!("Unable to acquire lock on Volta directory! Running migration anyway.");
+    });
+    detect_and_migrate()
 }
 
 fn detect_and_migrate() -> Fallible<()> {

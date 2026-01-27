@@ -59,41 +59,54 @@ pub struct VoltaLock {
 }
 
 impl VoltaLock {
+    /// # Errors
+    ///
+    /// Returns an error if the lock cannot be acquired.
     pub fn acquire() -> Fallible<Self> {
-        let mut state = LOCK_STATE
-            .lock()
+        // Check if there is an active lock for this process
+        {
+            let mut state = LOCK_STATE
+                .lock()
+                .with_context(|| ErrorKind::LockAcquireError)?;
+
+            if let Some(inner) = &mut *state {
+                // Increment count and return early - lock already held
+                inner.count += 1;
+                return Ok(Self {
+                    _private: PhantomData,
+                });
+            }
+        }
+        // MutexGuard dropped here before acquiring file lock
+
+        // Need to create a new file lock
+        let path = volta_home()?.root().join(LOCK_FILE);
+        debug!("Acquiring lock on Volta directory: {}", path.display());
+
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
             .with_context(|| ErrorKind::LockAcquireError)?;
 
-        // Check if there is an active lock for this process. If so, increment
-        // the count of active locks. If not, create a file lock and initialize
-        // the state with a count of 1
-        match &mut *state {
-            Some(inner) => {
-                inner.count += 1;
-            }
-            None => {
-                let path = volta_home()?.root().join(LOCK_FILE);
-                debug!("Acquiring lock on Volta directory: {}", path.display());
+        // First try to lock without blocking. If that fails, show a spinner and block.
+        if file.try_lock_exclusive().is_err() {
+            let spinner = progress_spinner("Waiting for file lock on Volta directory");
+            // Note: Blocks until the file can be locked
+            let lock_result = file
+                .lock_exclusive()
+                .with_context(|| ErrorKind::LockAcquireError);
+            spinner.finish_and_clear();
+            lock_result?;
+        }
 
-                let file = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .open(path)
-                    .with_context(|| ErrorKind::LockAcquireError)?;
-                // First we try to lock the file without blocking. If that fails, then we show a spinner
-                // and block until the lock completes.
-                if file.try_lock_exclusive().is_err() {
-                    let spinner = progress_spinner("Waiting for file lock on Volta directory");
-                    // Note: Blocks until the file can be locked
-                    let lock_result = file
-                        .lock_exclusive()
-                        .with_context(|| ErrorKind::LockAcquireError);
-                    spinner.finish_and_clear();
-                    lock_result?;
-                }
-
-                *state = Some(LockState { file, count: 1 });
-            }
+        // Re-acquire mutex to update state
+        {
+            let mut state = LOCK_STATE
+                .lock()
+                .with_context(|| ErrorKind::LockAcquireError)?;
+            *state = Some(LockState { file, count: 1 });
         }
 
         Ok(Self {

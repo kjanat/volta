@@ -7,19 +7,22 @@ use crate::error::{ErrorKind, Fallible};
 use crate::hook::ToolHooks;
 use crate::session::Session;
 use crate::tool::Npm;
-use crate::version::{VersionSpec, VersionTag};
+use crate::version::{VersionSpec, Tag};
 use log::debug;
-use node_semver::{Range, Version};
+use nodejs_semver::{Range, Version};
 
+/// # Errors
+///
+/// Returns an error if the version cannot be resolved.
 pub fn resolve(matching: VersionSpec, session: &mut Session) -> Fallible<Option<Version>> {
     let hooks = session.hooks()?.npm();
     match matching {
-        VersionSpec::Semver(requirement) => resolve_semver(requirement, hooks).map(Some),
+        VersionSpec::Semver(requirement) => resolve_semver(&requirement, hooks).map(Some),
         VersionSpec::Exact(version) => Ok(Some(version)),
-        VersionSpec::None | VersionSpec::Tag(VersionTag::Latest) => {
+        VersionSpec::None | VersionSpec::Tag(Tag::Latest) => {
             resolve_tag("latest", hooks).map(Some)
         }
-        VersionSpec::Tag(VersionTag::Custom(tag)) if tag == "bundled" => Ok(None),
+        VersionSpec::Tag(Tag::Custom(tag)) if tag == "bundled" => Ok(None),
         VersionSpec::Tag(tag) => resolve_tag(&tag.to_string(), hooks).map(Some),
     }
 }
@@ -42,19 +45,21 @@ fn fetch_npm_index(hooks: Option<&ToolHooks<Npm>>) -> Fallible<(String, PackageI
 fn resolve_tag(tag: &str, hooks: Option<&ToolHooks<Npm>>) -> Fallible<Version> {
     let (url, mut index) = fetch_npm_index(hooks)?;
 
-    match index.tags.remove(tag) {
-        Some(version) => {
-            debug!("Found npm@{} matching tag '{}' from {}", version, tag, url);
+    index.tags.remove(tag).map_or_else(
+        || {
+            Err(ErrorKind::NpmVersionNotFound {
+                matching: tag.into(),
+            }
+            .into())
+        },
+        |version| {
+            debug!("Found npm@{version} matching tag '{tag}' from {url}");
             Ok(version)
-        }
-        None => Err(ErrorKind::NpmVersionNotFound {
-            matching: tag.into(),
-        }
-        .into()),
-    }
+        },
+    )
 }
 
-fn resolve_semver(matching: Range, hooks: Option<&ToolHooks<Npm>>) -> Fallible<Version> {
+fn resolve_semver(matching: &Range, hooks: Option<&ToolHooks<Npm>>) -> Fallible<Version> {
     let (url, index) = fetch_npm_index(hooks)?;
 
     let details_opt = index

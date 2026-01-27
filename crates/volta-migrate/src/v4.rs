@@ -14,12 +14,13 @@ use volta_layout::v4;
 ///
 /// Holds a reference to the V4 layout struct to support potential future migrations
 pub struct V4 {
+    #[allow(dead_code)] // Kept for future migrations
     pub home: v4::VoltaHome,
 }
 
 impl V4 {
     pub fn new(home: PathBuf) -> Self {
-        V4 {
+        Self {
             home: v4::VoltaHome::new(home),
         }
     }
@@ -34,14 +35,14 @@ impl V4 {
             file: home.layout_file().to_owned(),
         })?;
 
-        Ok(V4 { home })
+        Ok(Self { home })
     }
 }
 
 impl TryFrom<Empty> for V4 {
     type Error = VoltaError;
 
-    fn try_from(old: Empty) -> Fallible<V4> {
+    fn try_from(old: Empty) -> Fallible<Self> {
         debug!("New Volta installation detected, creating fresh layout");
 
         let home = v4::VoltaHome::new(old.home);
@@ -49,14 +50,14 @@ impl TryFrom<Empty> for V4 {
             dir: home.root().to_owned(),
         })?;
 
-        V4::complete_migration(home)
+        Self::complete_migration(home)
     }
 }
 
 impl TryFrom<V3> for V4 {
     type Error = VoltaError;
 
-    fn try_from(old: V3) -> Fallible<V4> {
+    fn try_from(old: V3) -> Fallible<Self> {
         debug!("Migrating from V3 layout");
 
         let new_home = v4::VoltaHome::new(old.home.root().to_owned());
@@ -74,7 +75,7 @@ impl TryFrom<V3> for V4 {
         }
 
         // Complete the migration, writing the V4 layout file
-        let layout = V4::complete_migration(new_home)?;
+        let layout = Self::complete_migration(new_home)?;
 
         // Remove the V3 layout file, since we're now on V4 (do this after writing the V4 so that we know the migration succeeded)
         let old_layout_file = old.home.layout_file();

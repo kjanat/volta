@@ -29,8 +29,8 @@ pub(super) fn run_global_install(
     command.env("PATH", platform_image.path()?);
     PackageManager::Npm.setup_global_command(&mut command, staging_dir);
 
-    debug!("Installing {} with command: {:?}", package, command);
-    let spinner = progress_spinner(format!("Installing {}", package));
+    debug!("Installing {package} with command: {command:?}");
+    let spinner = progress_spinner(format!("Installing {package}"));
     let output_result = command
         .output()
         .with_context(|| ErrorKind::PackageInstallFailed {
@@ -40,7 +40,7 @@ pub(super) fn run_global_install(
     let output = output_result?;
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    debug!("[install stderr]\n{}", stderr);
+    debug!("[install stderr]\n{stderr}");
     debug!(
         "[install stdout]\n{}",
         String::from_utf8_lossy(&output.stdout)

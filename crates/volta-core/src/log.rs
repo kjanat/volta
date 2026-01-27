@@ -25,7 +25,7 @@ const ALLOWED_PREFIXES: [&str; 5] = [
 const WRAP_INDENT: &str = "    ";
 
 /// Represents the context from which the logger was created
-pub enum LogContext {
+pub enum Context {
     /// Log messages from the `volta` executable
     Volta,
 
@@ -38,7 +38,7 @@ pub enum LogContext {
 
 /// Represents the level of verbosity that was requested by the user
 #[derive(Debug, Copy, Clone)]
-pub enum LogVerbosity {
+pub enum Verbosity {
     Quiet,
     Default,
     Verbose,
@@ -46,7 +46,7 @@ pub enum LogVerbosity {
 }
 
 pub struct Logger {
-    context: LogContext,
+    context: Context,
     level: LevelFilter,
 }
 
@@ -82,22 +82,26 @@ impl Logger {
     /// Initialize the global logger with a Logger instance
     /// Will use the requested level of Verbosity
     /// If set to Default, will use the environment to determine the level of verbosity
-    pub fn init(context: LogContext, verbosity: LogVerbosity) -> Result<(), SetLoggerError> {
-        let logger = Logger::new(context, verbosity);
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the global logger has already been set.
+    pub fn init(context: Context, verbosity: Verbosity) -> Result<(), SetLoggerError> {
+        let logger = Self::new(context, verbosity);
         log::set_max_level(logger.level);
         log::set_boxed_logger(Box::new(logger))?;
         Ok(())
     }
 
-    fn new(context: LogContext, verbosity: LogVerbosity) -> Self {
+    fn new(context: Context, verbosity: Verbosity) -> Self {
         let level = match verbosity {
-            LogVerbosity::Quiet => LevelFilter::Error,
-            LogVerbosity::Default => level_from_env(),
-            LogVerbosity::Verbose => LevelFilter::Debug,
-            LogVerbosity::VeryVerbose => LevelFilter::Trace,
+            Verbosity::Quiet => LevelFilter::Error,
+            Verbosity::Default => level_from_env(),
+            Verbosity::Verbose => LevelFilter::Debug,
+            Verbosity::VeryVerbose => LevelFilter::Trace,
         };
 
-        Logger { context, level }
+        Self { context, level }
     }
 
     fn log_error<D>(&self, message: &D)
@@ -105,9 +109,9 @@ impl Logger {
         D: Display,
     {
         let prefix = match &self.context {
-            LogContext::Volta => ERROR_PREFIX,
-            LogContext::Shim => SHIM_ERROR_PREFIX,
-            LogContext::Migration => MIGRATION_ERROR_PREFIX,
+            Context::Volta => ERROR_PREFIX,
+            Context::Shim => SHIM_ERROR_PREFIX,
+            Context::Migration => MIGRATION_ERROR_PREFIX,
         };
 
         eprintln!("{} {}", style(prefix).red().bold(), message);
@@ -118,9 +122,9 @@ impl Logger {
         D: Display,
     {
         let prefix = match &self.context {
-            LogContext::Volta => WARNING_PREFIX,
-            LogContext::Shim => SHIM_WARNING_PREFIX,
-            LogContext::Migration => MIGRATION_WARNING_PREFIX,
+            Context::Volta => WARNING_PREFIX,
+            Context::Shim => SHIM_WARNING_PREFIX,
+            Context::Migration => MIGRATION_WARNING_PREFIX,
         };
 
         eprintln!(
@@ -140,21 +144,21 @@ fn wrap_content<D>(prefix: &str, content: &D) -> String
 where
     D: Display,
 {
-    match text_width() {
-        Some(width) => {
+    text_width().map_or_else(
+        || format!(" {content}"),
+        |width| {
             let options = Options::new(width)
                 .word_splitter(WordSplitter::NoHyphenation)
                 .subsequent_indent(WRAP_INDENT)
                 .break_words(false);
 
-            fill(&format!("{} {}", prefix, content), options).replace(prefix, "")
-        }
-        None => format!(" {}", content),
-    }
+            fill(&format!("{prefix} {content}"), options).replace(prefix, "")
+        },
+    )
 }
 
 /// Determines the correct logging level based on the environment
-/// If VOLTA_LOGLEVEL is set to a valid level, we use that
+/// If `VOLTA_LOGLEVEL` is set to a valid level, we use that
 /// If not, we check the current stdout to determine whether it is a TTY or not
 ///     If it is a TTY, we use Info
 ///     If it is NOT a TTY, we use Error as we don't want to show warnings when running as a script

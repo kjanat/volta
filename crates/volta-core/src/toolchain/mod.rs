@@ -5,34 +5,48 @@ use crate::fs::touch;
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
 use log::debug;
-use node_semver::Version;
+use nodejs_semver::Version;
 use once_cell::unsync::OnceCell;
 use readext::ReadExt;
 
 pub mod serial;
 
 /// Lazily loaded toolchain
+#[allow(clippy::module_name_repetitions)]
 pub struct LazyToolchain {
     toolchain: OnceCell<Toolchain>,
 }
 
 impl LazyToolchain {
     /// Creates a new `LazyToolchain`
-    pub fn init() -> Self {
-        LazyToolchain {
+    #[must_use]
+    pub const fn init() -> Self {
+        Self {
             toolchain: OnceCell::new(),
         }
     }
 
     /// Forces loading of the toolchain and returns an immutable reference to it
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the toolchain cannot be loaded.
     pub fn get(&self) -> Fallible<&Toolchain> {
         self.toolchain.get_or_try_init(Toolchain::current)
     }
 
     /// Forces loading of the toolchain and returns a mutable reference to it
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the toolchain cannot be loaded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `OnceCell` is not initialized after `get_or_try_init` succeeds (internal invariant violation).
     pub fn get_mut(&mut self) -> Fallible<&mut Toolchain> {
-        let _ = self.toolchain.get_or_try_init(Toolchain::current)?;
-        Ok(self.toolchain.get_mut().unwrap())
+        self.toolchain.get_or_try_init(Toolchain::current)?;
+        Ok(self.toolchain.get_mut().expect("cell initialized above"))
     }
 }
 
@@ -41,7 +55,7 @@ pub struct Toolchain {
 }
 
 impl Toolchain {
-    fn current() -> Fallible<Toolchain> {
+    fn current() -> Fallible<Self> {
         let path = volta_home()?.default_platform_file();
         let src = touch(path)
             .and_then(|mut file| file.read_into_string())
@@ -53,33 +67,35 @@ impl Toolchain {
         if platform.is_some() {
             debug!("Found default configuration at '{}'", path.display());
         }
-        Ok(Toolchain { platform })
+        Ok(Self { platform })
     }
 
-    pub fn platform(&self) -> Option<&PlatformSpec> {
+    #[must_use]
+    pub const fn platform(&self) -> Option<&PlatformSpec> {
         self.platform.as_ref()
     }
 
     /// Set the active Node version in the default platform file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the platform file cannot be saved.
     pub fn set_active_node(&mut self, node_version: &Version) -> Fallible<()> {
         let mut dirty = false;
 
-        match self.platform.as_mut() {
-            Some(platform) => {
-                if platform.node != *node_version {
-                    platform.node = node_version.clone();
-                    dirty = true;
-                }
-            }
-            None => {
-                self.platform = Some(PlatformSpec {
-                    node: node_version.clone(),
-                    npm: None,
-                    pnpm: None,
-                    yarn: None,
-                });
+        if let Some(platform) = self.platform.as_mut() {
+            if platform.node != *node_version {
+                platform.node = node_version.clone();
                 dirty = true;
             }
+        } else {
+            self.platform = Some(PlatformSpec {
+                node: node_version.clone(),
+                npm: None,
+                pnpm: None,
+                yarn: None,
+            });
+            dirty = true;
         }
 
         if dirty {
@@ -90,6 +106,10 @@ impl Toolchain {
     }
 
     /// Set the active Yarn version in the default platform file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no default Node version is set or the file cannot be saved.
     pub fn set_active_yarn(&mut self, yarn: Option<Version>) -> Fallible<()> {
         if let Some(platform) = self.platform.as_mut() {
             if platform.yarn != yarn {
@@ -107,6 +127,10 @@ impl Toolchain {
     }
 
     /// Set the active pnpm version in the default platform file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no default Node version is set or the file cannot be saved.
     pub fn set_active_pnpm(&mut self, pnpm: Option<Version>) -> Fallible<()> {
         if let Some(platform) = self.platform.as_mut() {
             if platform.pnpm != pnpm {
@@ -124,6 +148,10 @@ impl Toolchain {
     }
 
     /// Set the active Npm version in the default platform file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no default Node version is set or the file cannot be saved.
     pub fn set_active_npm(&mut self, npm: Option<Version>) -> Fallible<()> {
         if let Some(platform) = self.platform.as_mut() {
             if platform.npm != npm {
@@ -137,6 +165,9 @@ impl Toolchain {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the platform file cannot be written.
     pub fn save(&self) -> Fallible<()> {
         let path = volta_home()?.default_platform_file();
         let result = match &self.platform {

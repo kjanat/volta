@@ -9,7 +9,7 @@ pub struct Empty {
 }
 
 impl Empty {
-    pub fn new(home: PathBuf) -> Self {
-        Empty { home }
+    pub const fn new(home: PathBuf) -> Self {
+        Self { home }
     }
 }

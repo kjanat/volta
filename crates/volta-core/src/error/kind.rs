@@ -35,7 +35,7 @@ pub enum ErrorKind {
     /// Thrown when building the virtual environment path fails
     BuildPathError,
 
-    /// Thrown when unable to launch a command with VOLTA_BYPASS set
+    /// Thrown when unable to launch a command with `VOLTA_BYPASS` set
     BypassError {
         command: String,
     },
@@ -533,67 +533,63 @@ pub enum ErrorKind {
 }
 
 impl fmt::Display for ErrorKind {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ErrorKind::BinaryAlreadyInstalled {
+            Self::BinaryAlreadyInstalled {
                 bin_name,
                 existing_package,
                 new_package,
             } => write!(
                 f,
-                "Executable '{}' is already installed by {}
+                "Executable '{bin_name}' is already installed by {existing_package}
 
-Please remove {} before installing {}",
-                bin_name, existing_package, existing_package, new_package
+Please remove {existing_package} before installing {new_package}"
             ),
-            ErrorKind::BinaryExecError => write!(
+            Self::BinaryExecError => write!(
                 f,
                 "Could not execute command.
 
 See `volta help install` and `volta help pin` for info about making tools available."
             ),
-            ErrorKind::BinaryNotFound { name } => write!(
+            Self::BinaryNotFound { name } => write!(
                 f,
-                r#"Could not find executable "{}"
+                r#"Could not find executable "{name}"
 
-Use `volta install` to add a package to your toolchain (see `volta help install` for more info)."#,
-                name
+Use `volta install` to add a package to your toolchain (see `volta help install` for more info)."#
             ),
-            ErrorKind::BuildPathError => write!(
+            Self::BuildPathError => write!(
                 f,
                 "Could not create execution environment.
 
 Please ensure your PATH is valid."
             ),
-            ErrorKind::BypassError { command } => write!(
+            Self::BypassError { command } => write!(
                 f,
-                "Could not execute command '{}'
+                "Could not execute command '{command}'
 
 VOLTA_BYPASS is enabled, please ensure that the command exists on your system or unset VOLTA_BYPASS",
-                command,
             ),
-            ErrorKind::CannotFetchPackage { package } => write!(
+            Self::CannotFetchPackage { package } => write!(
                 f,
                 "Fetching packages without installing them is not supported.
 
-Use `volta install {}` to update the default version.",
-                package
+Use `volta install {package}` to update the default version."
             ),
-            ErrorKind::CannotPinPackage { package } => write!(
+            Self::CannotPinPackage { package } => write!(
                 f,
                 "Only node and yarn can be pinned in a project
 
-Use `npm install` or `yarn add` to select a version of {} for this project.",
-                package
+Use `npm install` or `yarn add` to select a version of {package} for this project."
             ),
-            ErrorKind::CompletionsOutFileError { path } => write!(
+            Self::CompletionsOutFileError { path } => write!(
                 f,
                 "Completions file `{}` already exists.
 
 Please remove the file or pass `-f` or `--force` to override.",
                 path.display()
             ),
-            ErrorKind::ContainingDirError { path } => write!(
+            Self::ContainingDirError { path } => write!(
                 f,
                 "Could not create the containing directory for {}
 
@@ -601,41 +597,39 @@ Please remove the file or pass `-f` or `--force` to override.",
                 path.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::CouldNotDetermineTool => write!(
+            Self::CouldNotDetermineTool => write!(
                 f,
                 "Could not determine tool name
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::CouldNotStartMigration => write!(
+            Self::CouldNotStartMigration => write!(
                 f,
                 "Could not start migration process to upgrade your Volta directory.
 
 Please ensure you have 'volta-migrate' on your PATH and run it directly."
             ),
-            ErrorKind::CreateDirError { dir } => write!(
+            Self::CreateDirError { dir } => write!(
                 f,
                 "Could not create directory {}
 
 Please ensure that you have the correct permissions.",
                 dir.display()
             ),
-            ErrorKind::CreateLayoutFileError { file } => write!(
+            Self::CreateLayoutFileError { file } => write!(
                 f,
                 "Could not create layout file {}
 
 {}",
                 file.display(), PERMISSIONS_CTA
             ),
-            ErrorKind::CreateSharedLinkError { name } => write!(
+            Self::CreateSharedLinkError { name } => write!(
                 f,
-                "Could not create shared environment for package '{}'
+                "Could not create shared environment for package '{name}'
 
-{}",
-                name, PERMISSIONS_CTA
+{PERMISSIONS_CTA}"
             ),
-            ErrorKind::CreateTempDirError { in_dir } => write!(
+            Self::CreateTempDirError { in_dir } => write!(
                 f,
                 "Could not create temporary directory
 in {}
@@ -644,7 +638,7 @@ in {}
                 in_dir.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::CreateTempFileError { in_dir } => write!(
+            Self::CreateTempFileError { in_dir } => write!(
                 f,
                 "Could not create temporary file
 in {}
@@ -653,13 +647,13 @@ in {}
                 in_dir.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::CurrentDirError => write!(
+            Self::CurrentDirError => write!(
                 f,
                 "Could not determine current directory
 
 Please ensure that you have the correct permissions."
             ),
-            ErrorKind::DeleteDirectoryError { directory } => write!(
+            Self::DeleteDirectoryError { directory } => write!(
                 f,
                 "Could not remove directory
 at {}
@@ -668,7 +662,7 @@ at {}
                 directory.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::DeleteFileError { file } => write!(
+            Self::DeleteFileError { file } => write!(
                 f,
                 "Could not remove file
 at {}
@@ -677,25 +671,23 @@ at {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::DeprecatedCommandError { command, advice } => {
-                write!(f, "The subcommand `{}` is deprecated.\n{}", command, advice)
+            Self::DeprecatedCommandError { command, advice } => {
+                write!(f, "The subcommand `{command}` is deprecated.\n{advice}")
             }
-            ErrorKind::DownloadToolNetworkError { tool, from_url } => write!(
+            Self::DownloadToolNetworkError { tool, from_url } => write!(
                 f,
-                "Could not download {}
-from {}
+                "Could not download {tool}
+from {from_url}
 
-Please verify your internet connection and ensure the correct version is specified.",
-                tool, from_url
+Please verify your internet connection and ensure the correct version is specified."
             ),
-            ErrorKind::ExecuteHookError { command } => write!(
+            Self::ExecuteHookError { command } => write!(
                 f,
-                "Could not execute hook command: '{}'
+                "Could not execute hook command: '{command}'
 
-Please ensure that the correct command is specified.",
-                command
+Please ensure that the correct command is specified."
             ),
-            ErrorKind::ExtensionCycleError { paths, duplicate } => {
+            Self::ExtensionCycleError { paths, duplicate } => {
                 // Detected infinite loop in project workspace:
                 //
                 // --> /home/user/workspace/project/package.json
@@ -720,71 +712,63 @@ Please ensure that the correct command is specified.",
 
                 f.write_str("Please ensure that project workspaces do not depend on each other.")
             }
-            ErrorKind::ExtensionPathError { path } => write!(
+            Self::ExtensionPathError { path } => write!(
                 f,
                 "Could not determine path to project workspace: '{}'
 
 Please ensure that the file exists and is accessible.",
                 path.display(),
             ),
-            ErrorKind::HookCommandFailed { command } => write!(
+            Self::HookCommandFailed { command } => write!(
                 f,
-                "Hook command '{}' indicated a failure.
+                "Hook command '{command}' indicated a failure.
 
-Please verify the requested tool and version.",
-                command
+Please verify the requested tool and version."
             ),
-            ErrorKind::HookMultipleFieldsSpecified => write!(
+            Self::HookMultipleFieldsSpecified => write!(
                 f,
                 "Hook configuration includes multiple hook types.
 
 Please include only one of 'bin', 'prefix', or 'template'"
             ),
-            ErrorKind::HookNoFieldsSpecified => write!(
+            Self::HookNoFieldsSpecified => write!(
                 f,
                 "Hook configuration includes no hook types.
 
 Please include one of 'bin', 'prefix', or 'template'"
             ),
-            ErrorKind::HookPathError { command } => write!(
+            Self::HookPathError { command } => write!(
                 f,
-                "Could not determine path to hook command: '{}'
+                "Could not determine path to hook command: '{command}'
 
-Please ensure that the correct command is specified.",
-                command
+Please ensure that the correct command is specified."
             ),
-            ErrorKind::InstalledPackageNameError => write!(
+            Self::InstalledPackageNameError => write!(
                 f,
                 "Could not determine the name of the package that was just installed.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::InvalidHookCommand { command } => write!(
+            Self::InvalidHookCommand { command } => write!(
                 f,
-                "Invalid hook command: '{}'
+                "Invalid hook command: '{command}'
 
-Please ensure that the correct command is specified.",
-                command
+Please ensure that the correct command is specified."
             ),
-            ErrorKind::InvalidHookOutput { command } => write!(
+            Self::InvalidHookOutput { command } => write!(
                 f,
-                "Could not read output from hook command: '{}'
+                "Could not read output from hook command: '{command}'
 
-Please ensure that the command output is valid UTF-8 text.",
-                command
+Please ensure that the command output is valid UTF-8 text."
             ),
 
-            ErrorKind::InvalidInvocation {
+            Self::InvalidInvocation {
                 action,
                 name,
                 version,
             } => {
                 let error = format!(
-                    "`volta {action} {name} {version}` is not supported.",
-                    action = action,
-                    name = name,
-                    version = version
+                    "`volta {action} {name} {version}` is not supported."
                 );
 
                 let call_to_action = format!(
@@ -801,17 +785,15 @@ To {action} the packages '{name}' and '{version}', please {action} them in separ
                     None => call_to_action,
                 };
 
-                write!(f, "{}\n\n{}", error, wrapped_cta)
+                write!(f, "{error}\n\n{wrapped_cta}")
             }
 
-            ErrorKind::InvalidInvocationOfBareVersion {
+            Self::InvalidInvocationOfBareVersion {
                 action,
                 version,
             } => {
                 let error = format!(
-                    "`volta {action} {version}` is not supported.",
-                    action = action,
-                    version = version
+                    "`volta {action} {version}` is not supported."
                 );
 
                 let call_to_action = format!(
@@ -827,23 +809,21 @@ To {action} the package '{version}', please use an explicit version such as '{ve
                     None => call_to_action,
                 };
 
-                write!(f, "{}\n\n{}", error, wrapped_cta)
+                write!(f, "{error}\n\n{wrapped_cta}")
             }
 
-            ErrorKind::InvalidRegistryFormat { format } => write!(
+            Self::InvalidRegistryFormat { format } => write!(
                 f,
-                "Unrecognized index registry format: '{}'
+                "Unrecognized index registry format: '{format}'
 
-Please specify either 'npm' or 'github' for the format.",
-format
+Please specify either 'npm' or 'github' for the format."
             ),
 
-            ErrorKind::InvalidToolName { name, errors } => {
+            Self::InvalidToolName { name, errors } => {
                 let indentation = "    ";
-                let wrapped = match text_width() {
-                    Some(width) => fill(&errors.join("\n"), width - indentation.len()),
-                    None => errors.join("\n"),
-                };
+                let joined = errors.join("\n");
+                let wrapped = text_width()
+                    .map_or_else(|| joined.clone(), |width| fill(&joined, width - indentation.len()));
                 let formatted_errs = indent(&wrapped, indentation);
 
                 let call_to_action = if errors.len() > 1 {
@@ -854,98 +834,93 @@ format
 
                 write!(
                     f,
-                    "Invalid tool name `{}`\n\n{}\n{}",
-                    name, call_to_action, formatted_errs
+                    "Invalid tool name `{name}`\n\n{call_to_action}\n{formatted_errs}"
                 )
             }
             // Note: No CTA as this error is purely informational and shouldn't be exposed to the user
-            ErrorKind::LockAcquireError => write!(
+            Self::LockAcquireError => write!(
                 f,
                 "Unable to acquire lock on Volta directory"
             ),
-            ErrorKind::NoBundledNpm { command } => write!(
+            Self::NoBundledNpm { command } => write!(
                 f,
                 "Could not detect bundled npm version.
 
-Please ensure you have a Node version selected with `volta {} node` (see `volta help {0}` for more info).",
-                command
+Please ensure you have a Node version selected with `volta {command} node` (see `volta help {command}` for more info)."
             ),
-            ErrorKind::NoCommandLinePnpm => write!(
+            Self::NoCommandLinePnpm => write!(
                 f,
                 "No pnpm version specified.
 
 Use `volta run --pnpm` to select a version (see `volta help run` for more info)."
             ),
-            ErrorKind::NoCommandLineYarn => write!(
+            Self::NoCommandLineYarn => write!(
                 f,
                 "No Yarn version specified.
 
 Use `volta run --yarn` to select a version (see `volta help run` for more info)."
             ),
-            ErrorKind::NoDefaultNodeVersion { tool } => write!(
+            Self::NoDefaultNodeVersion { tool } => write!(
                 f,
-                "Cannot install {} because the default Node version is not set.
+                "Cannot install {tool} because the default Node version is not set.
 
-Use `volta install node` to select a default Node first, then install a {0} version.",
-                                tool
+Use `volta install node` to select a default Node first, then install a {tool} version."
             ),
-            ErrorKind::NodeVersionNotFound { matching } => write!(
+            Self::NodeVersionNotFound { matching } => write!(
                 f,
-                r#"Could not find Node version matching "{}" in the version registry.
+                r#"Could not find Node version matching "{matching}" in the version registry.
 
-Please verify that the version is correct."#,
-                matching
+Please verify that the version is correct."#
             ),
-            ErrorKind::NoHomeEnvironmentVar => write!(
+            Self::NoHomeEnvironmentVar => write!(
                 f,
                 "Could not determine home directory.
 
 Please ensure the environment variable 'HOME' is set."
             ),
-            ErrorKind::NoInstallDir => write!(
+            Self::NoInstallDir => write!(
                 f,
                 "Could not determine Volta install directory.
 
 Please ensure Volta was installed correctly"
             ),
-            ErrorKind::NoLocalDataDir => write!(
+            Self::NoLocalDataDir => write!(
                 f,
                 "Could not determine LocalAppData directory.
 
 Please ensure the directory is available."
             ),
-            ErrorKind::NoPinnedNodeVersion { tool } => write!(
+            Self::NoPinnedNodeVersion { tool } => write!(
                 f,
-                "Cannot pin {} because the Node version is not pinned in this project.
+                "Cannot pin {tool} because the Node version is not pinned in this project.
 
-Use `volta pin node` to pin Node first, then pin a {0} version.",
-                tool
+Use `volta pin node` to pin Node first, then pin a {tool} version."
             ),
-            ErrorKind::NoPlatform => write!(
+            Self::NoPlatform => write!(
                 f,
                 "Node is not available.
 
 To run any Node command, first set a default version using `volta install node`"
             ),
-            ErrorKind::NoProjectNodeInManifest => write!(
+            Self::NoProjectNodeInManifest => write!(
                 f,
                 "No Node version found in this project.
 
 Use `volta pin node` to select a version (see `volta help pin` for more info)."
             ),
-            ErrorKind::NoProjectPnpm => write!(
+            Self::NoProjectPnpm => write!(
                 f,
                 "No pnpm version found in this project.
 
 Use `volta pin pnpm` to select a version (see `volta help pin` for more info)."
             ),
-            ErrorKind::NoProjectYarn => write!(
+            Self::NoProjectYarn => write!(
                 f,
                 "No Yarn version found in this project.
 
 Use `volta pin yarn` to select a version (see `volta help pin` for more info)."
             ),
-            ErrorKind::NoShellProfile { env_profile, bin_dir } => write!(
+            Self::NoShellProfile { env_profile, bin_dir } => write!(
                 f,
                 "Could not locate user profile.
 Tried $PROFILE ({}), ~/.bashrc, ~/.bash_profile, ~/.zshenv ~/.zshrc, ~/.profile, and ~/.config/fish/config.fish
@@ -953,81 +928,73 @@ Tried $PROFILE ({}), ~/.bashrc, ~/.bash_profile, ~/.zshenv ~/.zshrc, ~/.profile,
 Please create one of these and try again; or you can edit your profile manually to add '{}' to your PATH",
                 env_profile, bin_dir.display()
             ),
-            ErrorKind::NotInPackage => write!(
+            Self::NotInPackage => write!(
                 f,
                 "Not in a node package.
 
 Use `volta install` to select a default version of a tool."
             ),
-            ErrorKind::NoDefaultPnpm => write!(
+            Self::NoDefaultPnpm => write!(
                 f,
                 "pnpm is not available.
 
 Use `volta install pnpm` to select a default version (see `volta help install` for more info)."
             ),
-            ErrorKind::NoDefaultYarn => write!(
+            Self::NoDefaultYarn => write!(
                 f,
                 "Yarn is not available.
 
 Use `volta install yarn` to select a default version (see `volta help install` for more info)."
             ),
-            ErrorKind::NpmLinkMissingPackage { package } => write!(
+            Self::NpmLinkMissingPackage { package } => write!(
                 f,
-                "Could not locate the package '{}'
+                "Could not locate the package '{package}'
 
-Please ensure it is available by running `npm link` in its source directory.",
-                package
+Please ensure it is available by running `npm link` in its source directory."
             ),
-            ErrorKind::NpmLinkWrongManager { package } => write!(
+            Self::NpmLinkWrongManager { package } => write!(
                 f,
-                "The package '{}' was not installed using npm and cannot be linked with `npm link`
+                "The package '{package}' was not installed using npm and cannot be linked with `npm link`
 
-Please ensure it is linked with `npm link` or installed with `npm i -g {0}`.",
-                package
+Please ensure it is linked with `npm link` or installed with `npm i -g {package}`."
             ),
-            ErrorKind::NpmVersionNotFound { matching } => write!(
+            Self::NpmVersionNotFound { matching } => write!(
                 f,
-                r#"Could not find Node version matching "{}" in the version registry.
+                r#"Could not find Node version matching "{matching}" in the version registry.
 
-Please verify that the version is correct."#,
-                matching
+Please verify that the version is correct."#
             ),
-            ErrorKind::NpxNotAvailable { version } => write!(
+            Self::NpxNotAvailable { version } => write!(
                 f,
                 "'npx' is only available with npm >= 5.2.0
 
-This project is configured to use version {} of npm.",
-                version
+This project is configured to use version {version} of npm."
             ),
-            ErrorKind::PackageInstallFailed { package } => write!(
+            Self::PackageInstallFailed { package } => write!(
                 f,
-                "Could not install package '{}'
+                "Could not install package '{package}'
 
-Please confirm the package is valid and run with `--verbose` for more diagnostics.",
-                package
+Please confirm the package is valid and run with `--verbose` for more diagnostics."
             ),
-            ErrorKind::PackageManifestParseError { package } => write!(
+            Self::PackageManifestParseError { package } => write!(
                 f,
-                "Could not parse package.json manifest for {}
+                "Could not parse package.json manifest for {package}
 
-Please ensure the package includes a valid manifest file.",
-                package
+Please ensure the package includes a valid manifest file."
             ),
-            ErrorKind::PackageManifestReadError { package } => write!(
+            Self::PackageManifestReadError { package } => write!(
                 f,
-                "Could not read package.json manifest for {}
+                "Could not read package.json manifest for {package}
 
-Please ensure the package includes a valid manifest file.",
-                package
+Please ensure the package includes a valid manifest file."
             ),
-            ErrorKind::PackageNotFound { package } => write!(
+            Self::PackageNotFound { package } => write!(
                 f,
-                "Could not find '{}' in the package registry.
+                "Could not find '{package}' in the package registry.
 
-Please verify the requested package is correct.",
-                package
+Please verify the requested package is correct."
             ),
-            ErrorKind::PackageParseError { file } => write!(
+            Self::PackageParseError { file } => write!(
                 f,
                 "Could not parse project manifest
 at {}
@@ -1035,7 +1002,7 @@ at {}
 Please ensure that the file is correctly formatted.",
                 file.display()
             ),
-            ErrorKind::PackageReadError { file } => write!(
+            Self::PackageReadError { file } => write!(
                 f,
                 "Could not read project manifest
 from {}
@@ -1043,13 +1010,13 @@ from {}
 Please ensure that the file exists.",
                 file.display()
             ),
-            ErrorKind::PackageUnpackError => write!(
+            Self::PackageUnpackError => write!(
                 f,
                 "Could not determine package directory layout.
 
 Please ensure the package is correctly formatted."
             ),
-            ErrorKind::PackageWriteError { file } => write!(
+            Self::PackageWriteError { file } => write!(
                 f,
                 "Could not write project manifest
 to {}
@@ -1057,14 +1024,13 @@ to {}
 Please ensure you have correct permissions.",
                 file.display()
             ),
-            ErrorKind::ParseBinConfigError => write!(
+            Self::ParseBinConfigError => write!(
                 f,
                 "Could not parse executable configuration file.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::ParseHooksError { file } => write!(
+            Self::ParseHooksError { file } => write!(
                 f,
                 "Could not parse hooks configuration file.
 from {}
@@ -1072,96 +1038,86 @@ from {}
 Please ensure the file is correctly formatted.",
                 file.display()
             ),
-            ErrorKind::ParseNodeIndexCacheError => write!(
+            Self::ParseNodeIndexCacheError => write!(
                 f,
                 "Could not parse Node index cache file.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::ParseNodeIndexError { from_url } => write!(
+            Self::ParseNodeIndexError { from_url } => write!(
                 f,
                 "Could not parse Node version index
-from {}
+from {from_url}
 
-Please verify your internet connection.",
-                from_url
+Please verify your internet connection."
             ),
-            ErrorKind::ParseNodeIndexExpiryError => write!(
+            Self::ParseNodeIndexExpiryError => write!(
                 f,
                 "Could not parse Node index cache expiration file.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::ParseNpmManifestError => write!(
+            Self::ParseNpmManifestError => write!(
                 f,
                 "Could not parse package.json file for bundled npm.
 
 Please ensure the version of Node is correct."
             ),
-            ErrorKind::ParsePackageConfigError => write!(
+            Self::ParsePackageConfigError => write!(
                 f,
                 "Could not parse package configuration file.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::ParsePlatformError => write!(
+            Self::ParsePlatformError => write!(
                 f,
                 "Could not parse platform settings file.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::ParseToolSpecError { tool_spec } => write!(
+            Self::ParseToolSpecError { tool_spec } => write!(
                 f,
-                "Could not parse tool spec `{}`
+                "Could not parse tool spec `{tool_spec}`
 
-Please supply a spec in the format `<tool name>[@<version>]`.",
-                tool_spec
+Please supply a spec in the format `<tool name>[@<version>]`."
             ),
-            ErrorKind::PersistInventoryError { tool } => write!(
+            Self::PersistInventoryError { tool } => write!(
                 f,
-                "Could not store {} archive in inventory cache
+                "Could not store {tool} archive in inventory cache
 
-{}",
-                tool, PERMISSIONS_CTA
+{PERMISSIONS_CTA}"
             ),
-            ErrorKind::PnpmVersionNotFound { matching } => write!(
+            Self::PnpmVersionNotFound { matching } => write!(
                 f,
-                r#"Could not find pnpm version matching "{}" in the version registry.
+                r#"Could not find pnpm version matching "{matching}" in the version registry.
 
-Please verify that the version is correct."#,
-                matching
+Please verify that the version is correct."#
             ),
-            ErrorKind::ProjectLocalBinaryExecError { command } => write!(
+            Self::ProjectLocalBinaryExecError { command } => write!(
                 f,
-                "Could not execute `{}`
+                "Could not execute `{command}`
 
-Please ensure you have correct permissions to access the file.",
-                command
+Please ensure you have correct permissions to access the file."
             ),
-            ErrorKind::ProjectLocalBinaryNotFound { command } => write!(
+            Self::ProjectLocalBinaryNotFound { command } => write!(
                 f,
-                "Could not locate executable `{}` in your project.
+                "Could not locate executable `{command}` in your project.
 
-Please ensure that all project dependencies are installed with `npm install` or `yarn install`",
-                command
+Please ensure that all project dependencies are installed with `npm install` or `yarn install`"
             ),
-            ErrorKind::PublishHookBothUrlAndBin => write!(
+            Self::PublishHookBothUrlAndBin => write!(
                 f,
                 "Publish hook configuration includes both hook types.
 
 Please include only one of 'bin' or 'url'"
             ),
-            ErrorKind::PublishHookNeitherUrlNorBin => write!(
+            Self::PublishHookNeitherUrlNorBin => write!(
                 f,
                 "Publish hook configuration includes no hook types.
 
 Please include one of 'bin' or 'url'"
             ),
-            ErrorKind::ReadBinConfigDirError { dir } => write!(
+            Self::ReadBinConfigDirError { dir } => write!(
                 f,
                 "Could not read executable metadata directory
 at {}
@@ -1170,7 +1126,7 @@ at {}
                 dir.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::ReadBinConfigError { file } => write!(
+            Self::ReadBinConfigError { file } => write!(
                 f,
                 "Could not read executable configuration
 from {}
@@ -1179,7 +1135,7 @@ from {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::ReadDefaultNpmError { file } => write!(
+            Self::ReadDefaultNpmError { file } => write!(
                 f,
                 "Could not read default npm version
 from {}
@@ -1188,14 +1144,14 @@ from {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::ReadDirError { dir } => write!(
+            Self::ReadDirError { dir } => write!(
                 f,
                 "Could not read contents from directory {}
 
 {}",
                 dir.display(), PERMISSIONS_CTA
             ),
-            ErrorKind::ReadHooksError { file } => write!(
+            Self::ReadHooksError { file } => write!(
                 f,
                 "Could not read hooks file
 from {}
@@ -1204,7 +1160,7 @@ from {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::ReadNodeIndexCacheError { file } => write!(
+            Self::ReadNodeIndexCacheError { file } => write!(
                 f,
                 "Could not read Node index cache
 from {}
@@ -1213,7 +1169,7 @@ from {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::ReadNodeIndexExpiryError { file } => write!(
+            Self::ReadNodeIndexExpiryError { file } => write!(
                 f,
                 "Could not read Node index cache expiration
 from {}
@@ -1222,13 +1178,13 @@ from {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::ReadNpmManifestError => write!(
+            Self::ReadNpmManifestError => write!(
                 f,
                 "Could not read package.json file for bundled npm.
 
 Please ensure the version of Node is correct."
             ),
-            ErrorKind::ReadPackageConfigError { file } => write!(
+            Self::ReadPackageConfigError { file } => write!(
                 f,
                 "Could not read package configuration file
 from {}
@@ -1237,7 +1193,7 @@ from {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::ReadPlatformError { file } => write!(
+            Self::ReadPlatformError { file } => write!(
                 f,
                 "Could not read default platform file
 from {}
@@ -1253,28 +1209,26 @@ from {}
 
 Please ensure you have access to the your environment variables."
             ),
-            ErrorKind::RegistryFetchError { tool, from_url } => write!(
+            Self::RegistryFetchError { tool, from_url } => write!(
                 f,
-                "Could not download {} version registry
-from {}
+                "Could not download {tool} version registry
+from {from_url}
 
-Please verify your internet connection.",
-                tool, from_url
+Please verify your internet connection."
             ),
-            ErrorKind::RunShimDirectly => write!(
+            Self::RunShimDirectly => write!(
                 f,
                 "'volta-shim' should not be called directly.
 
 Please use the existing shims provided by Volta (node, yarn, etc.) to run tools."
             ),
-            ErrorKind::SetToolExecutable { tool } => write!(
+            Self::SetToolExecutable { tool } => write!(
                 f,
-                r#"Could not set "{}" to executable
+                r#"Could not set "{tool}" to executable
 
-{}"#,
-                tool, PERMISSIONS_CTA
+{PERMISSIONS_CTA}"#
             ),
-            ErrorKind::SetupToolImageError { tool, version, dir } => write!(
+            Self::SetupToolImageError { tool, version, dir } => write!(
                 f,
                 "Could not create environment for {} v{}
 at {}
@@ -1285,56 +1239,50 @@ at {}
                 dir.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::ShimCreateError { name } => write!(
+            Self::ShimCreateError { name } => write!(
                 f,
-                r#"Could not create shim for "{}"
+                r#"Could not create shim for "{name}"
 
-{}"#,
-                name, PERMISSIONS_CTA
+{PERMISSIONS_CTA}"#
             ),
-            ErrorKind::ShimRemoveError { name } => write!(
+            Self::ShimRemoveError { name } => write!(
                 f,
-                r#"Could not remove shim for "{}"
+                r#"Could not remove shim for "{name}"
 
-{}"#,
-                name, PERMISSIONS_CTA
+{PERMISSIONS_CTA}"#
             ),
-            ErrorKind::StringifyBinConfigError => write!(
+            Self::StringifyBinConfigError => write!(
                 f,
                 "Could not serialize executable configuration.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::StringifyPackageConfigError => write!(
+            Self::StringifyPackageConfigError => write!(
                 f,
                 "Could not serialize package configuration.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::StringifyPlatformError => write!(
+            Self::StringifyPlatformError => write!(
                 f,
                 "Could not serialize platform settings.
 
-{}",
-                REPORT_BUG_CTA
+{REPORT_BUG_CTA}"
             ),
-            ErrorKind::Unimplemented { feature } => {
-                write!(f, "{} is not supported yet.", feature)
+            Self::Unimplemented { feature } => {
+                write!(f, "{feature} is not supported yet.")
             }
-            ErrorKind::UnpackArchiveError { tool, version } => write!(
+            Self::UnpackArchiveError { tool, version } => write!(
                 f,
-                "Could not unpack {} v{}
+                "Could not unpack {tool} v{version}
 
-Please ensure the correct version is specified.",
-                tool, version
+Please ensure the correct version is specified."
             ),
-            ErrorKind::UpgradePackageNotFound { package, manager } => write!(
+            Self::UpgradePackageNotFound { package, manager } => write!(
                 f,
-                r#"Could not locate the package '{}' to upgrade.
+                r"Could not locate the package '{}' to upgrade.
 
-Please ensure it is installed with `{} {0}`"#,
+Please ensure it is installed with `{} {0}`",
                 package,
                 match manager {
                     PackageManager::Npm => "npm i -g",
@@ -1342,7 +1290,7 @@ Please ensure it is installed with `{} {0}`"#,
                     PackageManager::Yarn => "yarn global add",
                 }
             ),
-            ErrorKind::UpgradePackageWrongManager { package, manager } => {
+            Self::UpgradePackageWrongManager { package, manager } => {
                 let (name, command) = match manager {
                     PackageManager::Npm => ("npm", "npm update -g"),
                     PackageManager::Pnpm => ("pnpm", "pnpm update -g"),
@@ -1350,20 +1298,18 @@ Please ensure it is installed with `{} {0}`"#,
                 };
                 write!(
                     f,
-                    r#"The package '{}' was installed using {}.
+                    r"The package '{package}' was installed using {name}.
 
-To upgrade it, please use the command `{} {0}`"#,
-                    package, name, command
+To upgrade it, please use the command `{command} {package}`"
                 )
             }
-            ErrorKind::VersionParseError { version } => write!(
+            Self::VersionParseError { version } => write!(
                 f,
-                r#"Could not parse version "{}"
+                r#"Could not parse version "{version}"
 
-Please verify the intended version."#,
-                version
+Please verify the intended version."#
             ),
-            ErrorKind::WriteBinConfigError { file } => write!(
+            Self::WriteBinConfigError { file } => write!(
                 f,
                 "Could not write executable configuration
 to {}
@@ -1372,7 +1318,7 @@ to {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::WriteDefaultNpmError { file } => write!(
+            Self::WriteDefaultNpmError { file } => write!(
                 f,
                 "Could not write bundled npm version
 to {}
@@ -1381,14 +1327,13 @@ to {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::WriteLauncherError { tool } => write!(
+            Self::WriteLauncherError { tool } => write!(
                 f,
-                "Could not set up launcher for {}
+                "Could not set up launcher for {tool}
 
-This is most likely an intermittent failure, please try again.",
-                tool
+This is most likely an intermittent failure, please try again."
             ),
-            ErrorKind::WriteNodeIndexCacheError { file } => write!(
+            Self::WriteNodeIndexCacheError { file } => write!(
                 f,
                 "Could not write Node index cache
 to {}
@@ -1397,7 +1342,7 @@ to {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::WriteNodeIndexExpiryError { file } => write!(
+            Self::WriteNodeIndexExpiryError { file } => write!(
                 f,
                 "Could not write Node index cache expiration
 to {}
@@ -1406,7 +1351,7 @@ to {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::WritePackageConfigError { file } => write!(
+            Self::WritePackageConfigError { file } => write!(
                 f,
                 "Could not write package configuration
 to {}
@@ -1415,7 +1360,7 @@ to {}
                 file.display(),
                 PERMISSIONS_CTA
             ),
-            ErrorKind::WritePlatformError { file } => write!(
+            Self::WritePlatformError { file } => write!(
                 f,
                 "Could not save platform settings
 to {}
@@ -1431,152 +1376,152 @@ to {}
 
 Please ensure you have permissions to edit your environment variables."
             ),
-            ErrorKind::Yarn2NotSupported => write!(
+            Self::Yarn2NotSupported => write!(
                 f,
                 "Yarn version 2 is not recommended for use, and not supported by Volta.
 
 Please use version 3 or greater instead."
             ),
-            ErrorKind::YarnLatestFetchError { from_url } => write!(
+            Self::YarnLatestFetchError { from_url } => write!(
                 f,
                 "Could not fetch latest version of Yarn
-from {}
+from {from_url}
 
-Please verify your internet connection.",
-                from_url
+Please verify your internet connection."
             ),
-            ErrorKind::YarnVersionNotFound { matching } => write!(
+            Self::YarnVersionNotFound { matching } => write!(
                 f,
-                r#"Could not find Yarn version matching "{}" in the version registry.
+                r#"Could not find Yarn version matching "{matching}" in the version registry.
 
-Please verify that the version is correct."#,
-                matching
+Please verify that the version is correct."#
             ),
         }
     }
 }
 
 impl ErrorKind {
-    pub fn exit_code(&self) -> ExitCode {
+    #[allow(clippy::too_many_lines)]
+    #[must_use]
+    pub const fn exit_code(&self) -> ExitCode {
         match self {
-            ErrorKind::BinaryAlreadyInstalled { .. } => ExitCode::FileSystemError,
-            ErrorKind::BinaryExecError => ExitCode::ExecutionFailure,
-            ErrorKind::BinaryNotFound { .. } => ExitCode::ExecutableNotFound,
-            ErrorKind::BuildPathError => ExitCode::EnvironmentError,
-            ErrorKind::BypassError { .. } => ExitCode::ExecutionFailure,
-            ErrorKind::CannotFetchPackage { .. } => ExitCode::InvalidArguments,
-            ErrorKind::CannotPinPackage { .. } => ExitCode::InvalidArguments,
-            ErrorKind::CompletionsOutFileError { .. } => ExitCode::InvalidArguments,
-            ErrorKind::ContainingDirError { .. } => ExitCode::FileSystemError,
-            ErrorKind::CouldNotDetermineTool => ExitCode::UnknownError,
-            ErrorKind::CouldNotStartMigration => ExitCode::EnvironmentError,
-            ErrorKind::CreateDirError { .. } => ExitCode::FileSystemError,
-            ErrorKind::CreateLayoutFileError { .. } => ExitCode::FileSystemError,
-            ErrorKind::CreateSharedLinkError { .. } => ExitCode::FileSystemError,
-            ErrorKind::CreateTempDirError { .. } => ExitCode::FileSystemError,
-            ErrorKind::CreateTempFileError { .. } => ExitCode::FileSystemError,
-            ErrorKind::CurrentDirError => ExitCode::EnvironmentError,
-            ErrorKind::DeleteDirectoryError { .. } => ExitCode::FileSystemError,
-            ErrorKind::DeleteFileError { .. } => ExitCode::FileSystemError,
-            ErrorKind::DeprecatedCommandError { .. } => ExitCode::InvalidArguments,
-            ErrorKind::DownloadToolNetworkError { .. } => ExitCode::NetworkError,
-            ErrorKind::ExecuteHookError { .. } => ExitCode::ExecutionFailure,
-            ErrorKind::ExtensionCycleError { .. } => ExitCode::ConfigurationError,
-            ErrorKind::ExtensionPathError { .. } => ExitCode::FileSystemError,
-            ErrorKind::HookCommandFailed { .. } => ExitCode::ConfigurationError,
-            ErrorKind::HookMultipleFieldsSpecified => ExitCode::ConfigurationError,
-            ErrorKind::HookNoFieldsSpecified => ExitCode::ConfigurationError,
-            ErrorKind::HookPathError { .. } => ExitCode::ConfigurationError,
-            ErrorKind::InstalledPackageNameError => ExitCode::UnknownError,
-            ErrorKind::InvalidHookCommand { .. } => ExitCode::ExecutableNotFound,
-            ErrorKind::InvalidHookOutput { .. } => ExitCode::ExecutionFailure,
-            ErrorKind::InvalidInvocation { .. } => ExitCode::InvalidArguments,
-            ErrorKind::InvalidInvocationOfBareVersion { .. } => ExitCode::InvalidArguments,
-            ErrorKind::InvalidRegistryFormat { .. } => ExitCode::ConfigurationError,
-            ErrorKind::InvalidToolName { .. } => ExitCode::InvalidArguments,
-            ErrorKind::LockAcquireError => ExitCode::FileSystemError,
-            ErrorKind::NoBundledNpm { .. } => ExitCode::ConfigurationError,
-            ErrorKind::NoCommandLinePnpm => ExitCode::ConfigurationError,
-            ErrorKind::NoCommandLineYarn => ExitCode::ConfigurationError,
-            ErrorKind::NoDefaultNodeVersion { .. } => ExitCode::ConfigurationError,
-            ErrorKind::NodeVersionNotFound { .. } => ExitCode::NoVersionMatch,
-            ErrorKind::NoHomeEnvironmentVar => ExitCode::EnvironmentError,
-            ErrorKind::NoInstallDir => ExitCode::EnvironmentError,
-            ErrorKind::NoLocalDataDir => ExitCode::EnvironmentError,
-            ErrorKind::NoPinnedNodeVersion { .. } => ExitCode::ConfigurationError,
-            ErrorKind::NoPlatform => ExitCode::ConfigurationError,
-            ErrorKind::NoProjectNodeInManifest => ExitCode::ConfigurationError,
-            ErrorKind::NoProjectPnpm => ExitCode::ConfigurationError,
-            ErrorKind::NoProjectYarn => ExitCode::ConfigurationError,
-            ErrorKind::NoShellProfile { .. } => ExitCode::EnvironmentError,
-            ErrorKind::NotInPackage => ExitCode::ConfigurationError,
-            ErrorKind::NoDefaultPnpm => ExitCode::ConfigurationError,
-            ErrorKind::NoDefaultYarn => ExitCode::ConfigurationError,
-            ErrorKind::NpmLinkMissingPackage { .. } => ExitCode::ConfigurationError,
-            ErrorKind::NpmLinkWrongManager { .. } => ExitCode::ConfigurationError,
-            ErrorKind::NpmVersionNotFound { .. } => ExitCode::NoVersionMatch,
-            ErrorKind::NpxNotAvailable { .. } => ExitCode::ExecutableNotFound,
-            ErrorKind::PackageInstallFailed { .. } => ExitCode::UnknownError,
-            ErrorKind::PackageManifestParseError { .. } => ExitCode::ConfigurationError,
-            ErrorKind::PackageManifestReadError { .. } => ExitCode::FileSystemError,
-            ErrorKind::PackageNotFound { .. } => ExitCode::InvalidArguments,
-            ErrorKind::PackageParseError { .. } => ExitCode::ConfigurationError,
-            ErrorKind::PackageReadError { .. } => ExitCode::FileSystemError,
-            ErrorKind::PackageUnpackError => ExitCode::ConfigurationError,
-            ErrorKind::PackageWriteError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ParseBinConfigError => ExitCode::UnknownError,
-            ErrorKind::ParseHooksError { .. } => ExitCode::ConfigurationError,
-            ErrorKind::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
-            ErrorKind::ParseNodeIndexCacheError => ExitCode::UnknownError,
-            ErrorKind::ParseNodeIndexError { .. } => ExitCode::NetworkError,
-            ErrorKind::ParseNodeIndexExpiryError => ExitCode::UnknownError,
-            ErrorKind::ParseNpmManifestError => ExitCode::UnknownError,
-            ErrorKind::ParsePackageConfigError => ExitCode::UnknownError,
-            ErrorKind::ParsePlatformError => ExitCode::ConfigurationError,
-            ErrorKind::PersistInventoryError { .. } => ExitCode::FileSystemError,
-            ErrorKind::PnpmVersionNotFound { .. } => ExitCode::NoVersionMatch,
-            ErrorKind::ProjectLocalBinaryExecError { .. } => ExitCode::ExecutionFailure,
-            ErrorKind::ProjectLocalBinaryNotFound { .. } => ExitCode::FileSystemError,
-            ErrorKind::PublishHookBothUrlAndBin => ExitCode::ConfigurationError,
-            ErrorKind::PublishHookNeitherUrlNorBin => ExitCode::ConfigurationError,
-            ErrorKind::ReadBinConfigDirError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ReadBinConfigError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ReadDefaultNpmError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ReadDirError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ReadHooksError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ReadNodeIndexCacheError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ReadNodeIndexExpiryError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ReadNpmManifestError => ExitCode::UnknownError,
-            ErrorKind::ReadPackageConfigError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ReadPlatformError { .. } => ExitCode::FileSystemError,
+            Self::BinaryAlreadyInstalled { .. } => ExitCode::FileSystemError,
+            Self::BinaryExecError => ExitCode::ExecutionFailure,
+            Self::BinaryNotFound { .. } => ExitCode::ExecutableNotFound,
+            Self::BuildPathError => ExitCode::EnvironmentError,
+            Self::BypassError { .. } => ExitCode::ExecutionFailure,
+            Self::CannotFetchPackage { .. } => ExitCode::InvalidArguments,
+            Self::CannotPinPackage { .. } => ExitCode::InvalidArguments,
+            Self::CompletionsOutFileError { .. } => ExitCode::InvalidArguments,
+            Self::ContainingDirError { .. } => ExitCode::FileSystemError,
+            Self::CouldNotDetermineTool => ExitCode::UnknownError,
+            Self::CouldNotStartMigration => ExitCode::EnvironmentError,
+            Self::CreateDirError { .. } => ExitCode::FileSystemError,
+            Self::CreateLayoutFileError { .. } => ExitCode::FileSystemError,
+            Self::CreateSharedLinkError { .. } => ExitCode::FileSystemError,
+            Self::CreateTempDirError { .. } => ExitCode::FileSystemError,
+            Self::CreateTempFileError { .. } => ExitCode::FileSystemError,
+            Self::CurrentDirError => ExitCode::EnvironmentError,
+            Self::DeleteDirectoryError { .. } => ExitCode::FileSystemError,
+            Self::DeleteFileError { .. } => ExitCode::FileSystemError,
+            Self::DeprecatedCommandError { .. } => ExitCode::InvalidArguments,
+            Self::DownloadToolNetworkError { .. } => ExitCode::NetworkError,
+            Self::ExecuteHookError { .. } => ExitCode::ExecutionFailure,
+            Self::ExtensionCycleError { .. } => ExitCode::ConfigurationError,
+            Self::ExtensionPathError { .. } => ExitCode::FileSystemError,
+            Self::HookCommandFailed { .. } => ExitCode::ConfigurationError,
+            Self::HookMultipleFieldsSpecified => ExitCode::ConfigurationError,
+            Self::HookNoFieldsSpecified => ExitCode::ConfigurationError,
+            Self::HookPathError { .. } => ExitCode::ConfigurationError,
+            Self::InstalledPackageNameError => ExitCode::UnknownError,
+            Self::InvalidHookCommand { .. } => ExitCode::ExecutableNotFound,
+            Self::InvalidHookOutput { .. } => ExitCode::ExecutionFailure,
+            Self::InvalidInvocation { .. } => ExitCode::InvalidArguments,
+            Self::InvalidInvocationOfBareVersion { .. } => ExitCode::InvalidArguments,
+            Self::InvalidRegistryFormat { .. } => ExitCode::ConfigurationError,
+            Self::InvalidToolName { .. } => ExitCode::InvalidArguments,
+            Self::LockAcquireError => ExitCode::FileSystemError,
+            Self::NoBundledNpm { .. } => ExitCode::ConfigurationError,
+            Self::NoCommandLinePnpm => ExitCode::ConfigurationError,
+            Self::NoCommandLineYarn => ExitCode::ConfigurationError,
+            Self::NoDefaultNodeVersion { .. } => ExitCode::ConfigurationError,
+            Self::NodeVersionNotFound { .. } => ExitCode::NoVersionMatch,
+            Self::NoHomeEnvironmentVar => ExitCode::EnvironmentError,
+            Self::NoInstallDir => ExitCode::EnvironmentError,
+            Self::NoLocalDataDir => ExitCode::EnvironmentError,
+            Self::NoPinnedNodeVersion { .. } => ExitCode::ConfigurationError,
+            Self::NoPlatform => ExitCode::ConfigurationError,
+            Self::NoProjectNodeInManifest => ExitCode::ConfigurationError,
+            Self::NoProjectPnpm => ExitCode::ConfigurationError,
+            Self::NoProjectYarn => ExitCode::ConfigurationError,
+            Self::NoShellProfile { .. } => ExitCode::EnvironmentError,
+            Self::NotInPackage => ExitCode::ConfigurationError,
+            Self::NoDefaultPnpm => ExitCode::ConfigurationError,
+            Self::NoDefaultYarn => ExitCode::ConfigurationError,
+            Self::NpmLinkMissingPackage { .. } => ExitCode::ConfigurationError,
+            Self::NpmLinkWrongManager { .. } => ExitCode::ConfigurationError,
+            Self::NpmVersionNotFound { .. } => ExitCode::NoVersionMatch,
+            Self::NpxNotAvailable { .. } => ExitCode::ExecutableNotFound,
+            Self::PackageInstallFailed { .. } => ExitCode::UnknownError,
+            Self::PackageManifestParseError { .. } => ExitCode::ConfigurationError,
+            Self::PackageManifestReadError { .. } => ExitCode::FileSystemError,
+            Self::PackageNotFound { .. } => ExitCode::InvalidArguments,
+            Self::PackageParseError { .. } => ExitCode::ConfigurationError,
+            Self::PackageReadError { .. } => ExitCode::FileSystemError,
+            Self::PackageUnpackError => ExitCode::ConfigurationError,
+            Self::PackageWriteError { .. } => ExitCode::FileSystemError,
+            Self::ParseBinConfigError => ExitCode::UnknownError,
+            Self::ParseHooksError { .. } => ExitCode::ConfigurationError,
+            Self::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
+            Self::ParseNodeIndexCacheError => ExitCode::UnknownError,
+            Self::ParseNodeIndexError { .. } => ExitCode::NetworkError,
+            Self::ParseNodeIndexExpiryError => ExitCode::UnknownError,
+            Self::ParseNpmManifestError => ExitCode::UnknownError,
+            Self::ParsePackageConfigError => ExitCode::UnknownError,
+            Self::ParsePlatformError => ExitCode::ConfigurationError,
+            Self::PersistInventoryError { .. } => ExitCode::FileSystemError,
+            Self::PnpmVersionNotFound { .. } => ExitCode::NoVersionMatch,
+            Self::ProjectLocalBinaryExecError { .. } => ExitCode::ExecutionFailure,
+            Self::ProjectLocalBinaryNotFound { .. } => ExitCode::FileSystemError,
+            Self::PublishHookBothUrlAndBin => ExitCode::ConfigurationError,
+            Self::PublishHookNeitherUrlNorBin => ExitCode::ConfigurationError,
+            Self::ReadBinConfigDirError { .. } => ExitCode::FileSystemError,
+            Self::ReadBinConfigError { .. } => ExitCode::FileSystemError,
+            Self::ReadDefaultNpmError { .. } => ExitCode::FileSystemError,
+            Self::ReadDirError { .. } => ExitCode::FileSystemError,
+            Self::ReadHooksError { .. } => ExitCode::FileSystemError,
+            Self::ReadNodeIndexCacheError { .. } => ExitCode::FileSystemError,
+            Self::ReadNodeIndexExpiryError { .. } => ExitCode::FileSystemError,
+            Self::ReadNpmManifestError => ExitCode::UnknownError,
+            Self::ReadPackageConfigError { .. } => ExitCode::FileSystemError,
+            Self::ReadPlatformError { .. } => ExitCode::FileSystemError,
             #[cfg(windows)]
             ErrorKind::ReadUserPathError => ExitCode::EnvironmentError,
-            ErrorKind::RegistryFetchError { .. } => ExitCode::NetworkError,
-            ErrorKind::RunShimDirectly => ExitCode::InvalidArguments,
-            ErrorKind::SetupToolImageError { .. } => ExitCode::FileSystemError,
-            ErrorKind::SetToolExecutable { .. } => ExitCode::FileSystemError,
-            ErrorKind::ShimCreateError { .. } => ExitCode::FileSystemError,
-            ErrorKind::ShimRemoveError { .. } => ExitCode::FileSystemError,
-            ErrorKind::StringifyBinConfigError => ExitCode::UnknownError,
-            ErrorKind::StringifyPackageConfigError => ExitCode::UnknownError,
-            ErrorKind::StringifyPlatformError => ExitCode::UnknownError,
-            ErrorKind::Unimplemented { .. } => ExitCode::UnknownError,
-            ErrorKind::UnpackArchiveError { .. } => ExitCode::UnknownError,
-            ErrorKind::UpgradePackageNotFound { .. } => ExitCode::ConfigurationError,
-            ErrorKind::UpgradePackageWrongManager { .. } => ExitCode::ConfigurationError,
-            ErrorKind::VersionParseError { .. } => ExitCode::NoVersionMatch,
-            ErrorKind::WriteBinConfigError { .. } => ExitCode::FileSystemError,
-            ErrorKind::WriteDefaultNpmError { .. } => ExitCode::FileSystemError,
-            ErrorKind::WriteLauncherError { .. } => ExitCode::FileSystemError,
-            ErrorKind::WriteNodeIndexCacheError { .. } => ExitCode::FileSystemError,
-            ErrorKind::WriteNodeIndexExpiryError { .. } => ExitCode::FileSystemError,
-            ErrorKind::WritePackageConfigError { .. } => ExitCode::FileSystemError,
-            ErrorKind::WritePlatformError { .. } => ExitCode::FileSystemError,
+            Self::RegistryFetchError { .. } => ExitCode::NetworkError,
+            Self::RunShimDirectly => ExitCode::InvalidArguments,
+            Self::SetupToolImageError { .. } => ExitCode::FileSystemError,
+            Self::SetToolExecutable { .. } => ExitCode::FileSystemError,
+            Self::ShimCreateError { .. } => ExitCode::FileSystemError,
+            Self::ShimRemoveError { .. } => ExitCode::FileSystemError,
+            Self::StringifyBinConfigError => ExitCode::UnknownError,
+            Self::StringifyPackageConfigError => ExitCode::UnknownError,
+            Self::StringifyPlatformError => ExitCode::UnknownError,
+            Self::Unimplemented { .. } => ExitCode::UnknownError,
+            Self::UnpackArchiveError { .. } => ExitCode::UnknownError,
+            Self::UpgradePackageNotFound { .. } => ExitCode::ConfigurationError,
+            Self::UpgradePackageWrongManager { .. } => ExitCode::ConfigurationError,
+            Self::VersionParseError { .. } => ExitCode::NoVersionMatch,
+            Self::WriteBinConfigError { .. } => ExitCode::FileSystemError,
+            Self::WriteDefaultNpmError { .. } => ExitCode::FileSystemError,
+            Self::WriteLauncherError { .. } => ExitCode::FileSystemError,
+            Self::WriteNodeIndexCacheError { .. } => ExitCode::FileSystemError,
+            Self::WriteNodeIndexExpiryError { .. } => ExitCode::FileSystemError,
+            Self::WritePackageConfigError { .. } => ExitCode::FileSystemError,
+            Self::WritePlatformError { .. } => ExitCode::FileSystemError,
             #[cfg(windows)]
             ErrorKind::WriteUserPathError => ExitCode::EnvironmentError,
-            ErrorKind::Yarn2NotSupported => ExitCode::NoVersionMatch,
-            ErrorKind::YarnLatestFetchError { .. } => ExitCode::NetworkError,
-            ErrorKind::YarnVersionNotFound { .. } => ExitCode::NoVersionMatch,
+            Self::Yarn2NotSupported => ExitCode::NoVersionMatch,
+            Self::YarnLatestFetchError { .. } => ExitCode::NetworkError,
+            Self::YarnVersionNotFound { .. } => ExitCode::NoVersionMatch,
         }
     }
 }

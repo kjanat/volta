@@ -31,8 +31,8 @@ impl<R: Read, T, F: FnMut(&T, usize) -> T> Read for ProgressRead<R, T, F> {
 impl<R: Read, T, F: FnMut(&T, usize) -> T> ProgressRead<R, T, F> {
     /// Construct a new progress reader with the specified underlying reader,
     /// initial value for an accumulator, and progress callback.
-    pub fn new(source: R, init: T, progress: F) -> ProgressRead<R, T, F> {
-        ProgressRead {
+    pub const fn new(source: R, init: T, progress: F) -> Self {
+        Self {
             source,
             accumulator: init,
             progress,

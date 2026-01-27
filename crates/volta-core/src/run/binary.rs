@@ -20,43 +20,29 @@ pub(super) fn command(exe: &OsStr, args: &[OsString], session: &mut Session) -> 
     if let Some(project) = session.project()? {
         // Check if the executable is a direct dependency
         if project.has_direct_bin(exe)? {
-            match project.find_bin(exe) {
-                Some(path_to_bin) => {
-                    debug!("Found {} in project at '{}'", bin, path_to_bin.display());
+            if let Some(path_to_bin) = project.find_bin(exe) {
+                debug!("Found {} in project at '{}'", bin, path_to_bin.display());
 
-                    let platform = Platform::current(session)?;
-                    return Ok(ToolCommand::new(
-                        path_to_bin,
-                        args,
-                        platform,
-                        ToolKind::ProjectLocalBinary(bin),
-                    )
-                    .into());
-                }
-                None => {
-                    if project.needs_yarn_run() {
-                        debug!(
-                            "Project needs to use yarn to run command, calling {} with 'yarn'",
-                            bin
-                        );
-                        let platform = Platform::current(session)?;
-                        let mut exe_and_args = vec![exe.to_os_string()];
-                        exe_and_args.extend_from_slice(args);
-                        return Ok(ToolCommand::new(
-                            "yarn",
-                            exe_and_args,
-                            platform,
-                            ToolKind::Yarn,
-                        )
-                        .into());
-                    } else {
-                        return Err(ErrorKind::ProjectLocalBinaryNotFound {
-                            command: exe.to_string_lossy().to_string(),
-                        }
-                        .into());
-                    }
-                }
+                let platform = Platform::current(session)?;
+                return Ok(ToolCommand::new(
+                    path_to_bin,
+                    args,
+                    platform,
+                    ToolKind::ProjectLocalBinary(bin),
+                )
+                .into());
             }
+            if project.needs_yarn_run() {
+                debug!("Project needs to use yarn to run command, calling {bin} with 'yarn'");
+                let platform = Platform::current(session)?;
+                let mut exe_and_args = vec![exe.to_os_string()];
+                exe_and_args.extend_from_slice(args);
+                return Ok(ToolCommand::new("yarn", exe_and_args, platform, ToolKind::Yarn).into());
+            }
+            return Err(ErrorKind::ProjectLocalBinaryNotFound {
+                command: exe.to_string_lossy().to_string(),
+            }
+            .into());
         }
     }
 
@@ -90,23 +76,20 @@ pub(super) fn local_execution_context(
     platform: Option<Platform>,
     session: &mut Session,
 ) -> Fallible<(OsString, ErrorKind)> {
-    match platform {
-        Some(plat) => {
-            let image = plat.checkout(session)?;
-            let path = image.path()?;
-            debug_active_image(&image);
+    if let Some(plat) = platform {
+        let image = plat.checkout(session)?;
+        let path = image.path()?;
+        debug_active_image(&image);
 
-            Ok((
-                path,
-                ErrorKind::ProjectLocalBinaryExecError { command: tool },
-            ))
-        }
-        None => {
-            let path = System::path()?;
-            debug_no_platform();
+        Ok((
+            path,
+            ErrorKind::ProjectLocalBinaryExecError { command: tool },
+        ))
+    } else {
+        let path = System::path()?;
+        debug_no_platform();
 
-            Ok((path, ErrorKind::NoPlatform))
-        }
+        Ok((path, ErrorKind::NoPlatform))
     }
 }
 
@@ -116,20 +99,17 @@ pub(super) fn default_execution_context(
     platform: Option<Platform>,
     session: &mut Session,
 ) -> Fallible<(OsString, ErrorKind)> {
-    match platform {
-        Some(plat) => {
-            let image = plat.checkout(session)?;
-            let path = image.path()?;
-            debug_active_image(&image);
+    if let Some(plat) = platform {
+        let image = plat.checkout(session)?;
+        let path = image.path()?;
+        debug_active_image(&image);
 
-            Ok((path, ErrorKind::BinaryExecError))
-        }
-        None => {
-            let path = System::path()?;
-            debug_no_platform();
+        Ok((path, ErrorKind::BinaryExecError))
+    } else {
+        let path = System::path()?;
+        debug_no_platform();
 
-            Ok((path, ErrorKind::BinaryNotFound { name: tool }))
-        }
+        Ok((path, ErrorKind::BinaryNotFound { name: tool }))
     }
 }
 
@@ -137,12 +117,16 @@ pub(super) fn default_execution_context(
 ///
 /// Fetched from the config files in the Volta directory, represents the binary that is executed
 /// when the user is outside of a project that has the given bin as a dependency.
+#[allow(clippy::module_name_repetitions)]
 pub struct DefaultBinary {
     pub bin_path: PathBuf,
     pub platform: Platform,
 }
 
 impl DefaultBinary {
+    /// # Errors
+    ///
+    /// Returns an error if the binary configuration cannot be loaded.
     pub fn from_config(bin_config: BinConfig, session: &mut Session) -> Fallible<Self> {
         let package_dir = volta_home()?.package_image_dir(&bin_config.package);
         let mut bin_path = bin_config.manager.binary_dir(package_dir);
@@ -163,34 +147,35 @@ impl DefaultBinary {
             yarn: yarn.map(Sourced::with_binary),
         };
 
-        Ok(DefaultBinary { bin_path, platform })
+        Ok(Self { bin_path, platform })
     }
 
     /// Load information about a default binary by name, if available
     ///
     /// A `None` response here means that the tool information couldn't be found. Either the tool
     /// name is not a valid UTF-8 string, or the tool config doesn't exist.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the binary configuration cannot be loaded.
     pub fn from_name(tool_name: &OsStr, session: &mut Session) -> Fallible<Option<Self>> {
         let bin_config_file = match tool_name.to_str() {
             Some(name) => volta_home()?.default_tool_bin_config(name),
             None => return Ok(None),
         };
 
-        match BinConfig::from_file_if_exists(bin_config_file)? {
-            Some(config) => DefaultBinary::from_config(config, session).map(Some),
-            None => Ok(None),
-        }
+        BinConfig::from_file_if_exists(bin_config_file)?.map_or_else(
+            || Ok(None),
+            |config| Self::from_config(config, session).map(Some),
+        )
     }
 }
 
-/// Determine the value for NODE_PATH, with the shared lib directory prepended
+/// Determine the value for `NODE_PATH`, with the shared lib directory prepended
 ///
 /// This will ensure that global bins can `require` other global libs
 fn shared_module_path() -> Fallible<OsString> {
-    let node_path = match env::var("NODE_PATH") {
-        Ok(path) => envoy::Var::from(path),
-        Err(_) => envoy::Var::from(""),
-    };
+    let node_path = env::var("NODE_PATH").map_or_else(|_| envoy::Var::from(""), envoy::Var::from);
 
     node_path
         .split()

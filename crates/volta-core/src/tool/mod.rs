@@ -23,14 +23,14 @@ pub mod yarn;
 pub use node::{
     load_default_npm_version, Node, NODE_DISTRO_ARCH, NODE_DISTRO_EXTENSION, NODE_DISTRO_OS,
 };
-pub use npm::{BundledNpm, Npm};
+pub use npm::{Bundled, Npm};
 pub use package::{BinConfig, Package, PackageConfig, PackageManifest};
 pub use pnpm::Pnpm;
 pub use registry::PackageDetails;
 pub use yarn::Yarn;
 
 fn debug_already_fetched<T: Display>(tool: T) {
-    debug!("{} has already been fetched, skipping download", tool);
+    debug!("{tool} has already been fetched, skipping download");
 }
 
 fn info_installed<T: Display>(tool: T) {
@@ -51,8 +51,8 @@ where
     D: Display,
 {
     info!(
-        r#"{} you are using {project_version} in the current project; to
-         instead use {default_version}, run `volta pin {default_version}`"#,
+        r"{} you are using {project_version} in the current project; to
+         instead use {default_version}, run `volta pin {default_version}`",
         note_prefix()
     );
 }
@@ -60,10 +60,22 @@ where
 /// Trait representing all of the actions that can be taken with a tool
 pub trait Tool: Display {
     /// Fetch a Tool into the local inventory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool cannot be fetched.
     fn fetch(self: Box<Self>, session: &mut Session) -> Fallible<()>;
     /// Install a tool, making it the default so it is available everywhere on the user's machine
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool cannot be installed.
     fn install(self: Box<Self>, session: &mut Session) -> Fallible<()>;
     /// Pin a tool in the local project so that it is usable within the project
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool cannot be pinned.
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()>;
 }
 
@@ -80,17 +92,21 @@ pub enum Spec {
 
 impl Spec {
     /// Resolve a tool spec into a fully realized Tool that can be fetched
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool cannot be resolved.
     pub fn resolve(self, session: &mut Session) -> Fallible<Box<dyn Tool>> {
         match self {
-            Spec::Node(version) => {
+            Self::Node(version) => {
                 let version = node::resolve(version, session)?;
                 Ok(Box::new(Node::new(version)))
             }
-            Spec::Npm(version) => match npm::resolve(version, session)? {
-                Some(version) => Ok(Box::new(Npm::new(version))),
-                None => Ok(Box::new(BundledNpm)),
-            },
-            Spec::Pnpm(version) => {
+            Self::Npm(version) => npm::resolve(version, session)?.map_or_else(
+                || Ok(Box::new(Bundled) as Box<dyn Tool>),
+                |version| Ok(Box::new(Npm::new(version))),
+            ),
+            Self::Pnpm(version) => {
                 // If the pnpm feature flag is set, use the special-cased package manager logic
                 // to handle resolving (and ultimately fetching / installing) pnpm. If not, then
                 // fall back to the global package behavior, which was the case prior to pnpm
@@ -103,12 +119,12 @@ impl Spec {
                     Ok(Box::new(package))
                 }
             }
-            Spec::Yarn(version) => {
+            Self::Yarn(version) => {
                 let version = yarn::resolve(version, session)?;
                 Ok(Box::new(Yarn::new(version)))
             }
             // When using global package install, we allow the package manager to perform the version resolution
-            Spec::Package(name, version) => {
+            Self::Package(name, version) => {
                 let package = Package::new(name, version)?;
                 Ok(Box::new(package))
             }
@@ -119,17 +135,21 @@ impl Spec {
     ///
     /// This is implemented on Spec, instead of Resolved, because there is currently no need to
     /// resolve the specific version before uninstalling a tool.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool cannot be uninstalled.
     pub fn uninstall(self) -> Fallible<()> {
         match self {
-            Spec::Node(_) => Err(ErrorKind::Unimplemented {
+            Self::Node(_) => Err(ErrorKind::Unimplemented {
                 feature: "Uninstalling node".into(),
             }
             .into()),
-            Spec::Npm(_) => Err(ErrorKind::Unimplemented {
+            Self::Npm(_) => Err(ErrorKind::Unimplemented {
                 feature: "Uninstalling npm".into(),
             }
             .into()),
-            Spec::Pnpm(_) => {
+            Self::Pnpm(_) => {
                 if env::var_os(VOLTA_FEATURE_PNPM).is_some() {
                     Err(ErrorKind::Unimplemented {
                         feature: "Uninstalling pnpm".into(),
@@ -139,22 +159,23 @@ impl Spec {
                     package::uninstall("pnpm")
                 }
             }
-            Spec::Yarn(_) => Err(ErrorKind::Unimplemented {
+            Self::Yarn(_) => Err(ErrorKind::Unimplemented {
                 feature: "Uninstalling yarn".into(),
             }
             .into()),
-            Spec::Package(name, _) => package::uninstall(&name),
+            Self::Package(name, _) => package::uninstall(&name),
         }
     }
 
     /// The name of the tool, without the version, used for messaging
+    #[must_use] 
     pub fn name(&self) -> &str {
         match self {
-            Spec::Node(_) => "Node",
-            Spec::Npm(_) => "npm",
-            Spec::Pnpm(_) => "pnpm",
-            Spec::Yarn(_) => "Yarn",
-            Spec::Package(name, _) => name,
+            Self::Node(_) => "Node",
+            Self::Npm(_) => "npm",
+            Self::Pnpm(_) => "pnpm",
+            Self::Yarn(_) => "Yarn",
+            Self::Package(name, _) => name,
         }
     }
 }
@@ -162,11 +183,11 @@ impl Spec {
 impl Display for Spec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            Spec::Node(ref version) => tool_version("node", version),
-            Spec::Npm(ref version) => tool_version("npm", version),
-            Spec::Pnpm(ref version) => tool_version("pnpm", version),
-            Spec::Yarn(ref version) => tool_version("yarn", version),
-            Spec::Package(ref name, ref version) => tool_version(name, version),
+            Self::Node(version) => tool_version("node", version),
+            Self::Npm(version) => tool_version("npm", version),
+            Self::Pnpm(version) => tool_version("pnpm", version),
+            Self::Yarn(version) => tool_version("yarn", version),
+            Self::Package(name, version) => tool_version(name, version),
         };
         f.write_str(&s)
     }
@@ -192,22 +213,22 @@ fn check_fetched<F>(already_fetched: F) -> Fallible<FetchStatus>
 where
     F: Fn() -> Fallible<bool>,
 {
-    if !already_fetched()? {
-        let lock = match VoltaLock::acquire() {
-            Ok(l) => Some(l),
-            Err(_) => {
+    if already_fetched()? {
+        Ok(FetchStatus::AlreadyFetched)
+    } else {
+        let lock = VoltaLock::acquire().map_or_else(
+            |_| {
                 debug!("Unable to acquire lock on Volta directory!");
                 None
-            }
-        };
+            },
+            Some,
+        );
 
-        if !already_fetched()? {
-            Ok(FetchStatus::FetchNeeded(lock))
-        } else {
+        if already_fetched()? {
             Ok(FetchStatus::AlreadyFetched)
+        } else {
+            Ok(FetchStatus::FetchNeeded(lock))
         }
-    } else {
-        Ok(FetchStatus::AlreadyFetched)
     }
 }
 

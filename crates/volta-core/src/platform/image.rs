@@ -5,7 +5,7 @@ use super::{build_path_error, Sourced};
 use crate::error::{Context, Fallible};
 use crate::layout::volta_home;
 use crate::tool::load_default_npm_version;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 /// A platform image.
 pub struct Image {
@@ -48,9 +48,17 @@ impl Image {
     /// Produces a modified version of the current `PATH` environment variable that
     /// will find toolchain executables (Node, npm, pnpm, Yarn) in the installation directories
     /// for the given versions instead of in the Volta shim directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the path cannot be computed.
     pub fn path(&self) -> Fallible<OsString> {
         let old_path = envoy::path().unwrap_or_else(|| envoy::Var::from(""));
+        self.path_with_base(&old_path)
+    }
 
+    /// Internal helper for path computation, used by tests to avoid mutating environment
+    fn path_with_base(&self, old_path: &envoy::Var) -> Fallible<OsString> {
         old_path
             .split()
             .prefix(self.bins()?)
@@ -58,14 +66,25 @@ impl Image {
             .with_context(build_path_error)
     }
 
+    #[cfg(test)]
+    pub fn path_from(&self, base_path: &str) -> Fallible<OsString> {
+        self.path_with_base(&envoy::Var::from(base_path))
+    }
+
     /// Determines the sourced version of npm that will be available, resolving the version bundled with Node, if needed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bundled npm version cannot be determined.
     pub fn resolve_npm(&self) -> Fallible<Sourced<Version>> {
-        match &self.npm {
-            Some(npm) => Ok(npm.clone()),
-            None => load_default_npm_version(&self.node.value).map(|npm| Sourced {
-                value: npm,
-                source: self.node.source,
-            }),
-        }
+        self.npm.as_ref().map_or_else(
+            || {
+                load_default_npm_version(&self.node.value).map(|npm| Sourced {
+                    value: npm,
+                    source: self.node.source,
+                })
+            },
+            |npm| Ok(npm.clone()),
+        )
     }
 }

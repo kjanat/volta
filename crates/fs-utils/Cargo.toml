@@ -1,6 +1,15 @@
 [package]
-name    = "fs-utils"
-version = "0.1.0"
-edition = "2021"
+name                 = "fs-utils"
+version              = "0.1.0"
+edition.workspace    = true
+repository.workspace = true
+license.workspace    = true
+readme.workspace     = true
+keywords.workspace   = true
+categories.workspace = true
+description          = "Filesystem utilities for Volta"
 
 [dependencies]
+
+[lints]
+workspace = true

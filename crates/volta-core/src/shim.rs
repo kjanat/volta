@@ -13,11 +13,14 @@ use log::debug;
 
 pub use platform::create;
 
+/// # Errors
+///
+/// Returns an error if the shims cannot be regenerated.
 pub fn regenerate_shims_for_dir(dir: &Path) -> Fallible<()> {
     // Acquire a lock on the Volta directory, if possible, to prevent concurrent changes
     let _lock = VoltaLock::acquire();
     debug!("Rebuilding shims for directory: {}", dir.display());
-    for shim_name in get_shim_list_deduped(dir)?.iter() {
+    for shim_name in &get_shim_list_deduped(dir)? {
         delete(shim_name)?;
         create(shim_name)?;
     }
@@ -51,6 +54,7 @@ fn get_shim_list_deduped(dir: &Path) -> Fallible<HashSet<String>> {
 }
 
 #[derive(PartialEq, Eq)]
+#[allow(clippy::module_name_repetitions)]
 pub enum ShimResult {
     Created,
     AlreadyExists,
@@ -58,6 +62,9 @@ pub enum ShimResult {
     DoesntExist,
 }
 
+/// # Errors
+///
+/// Returns an error if the shim cannot be deleted.
 pub fn delete(shim_name: &str) -> Fallible<ShimResult> {
     let shim = volta_home()?.shim_file(shim_name);
 
@@ -65,7 +72,7 @@ pub fn delete(shim_name: &str) -> Fallible<ShimResult> {
     platform::delete_git_bash_script(shim_name)?;
 
     match fs::remove_file(shim) {
-        Ok(_) => Ok(ShimResult::Deleted),
+        Ok(()) => Ok(ShimResult::Deleted),
         Err(err) => {
             if err.kind() == io::ErrorKind::NotFound {
                 Ok(ShimResult::DoesntExist)
@@ -97,12 +104,15 @@ mod platform {
     use crate::fs::symlink_file;
     use crate::layout::{volta_home, volta_install};
 
+    /// # Errors
+    ///
+    /// Returns an error if the shim cannot be created.
     pub fn create(shim_name: &str) -> Fallible<ShimResult> {
         let executable = volta_install()?.shim_executable();
         let shim = volta_home()?.shim_file(shim_name);
 
         match symlink_file(executable, shim) {
-            Ok(_) => Ok(ShimResult::Created),
+            Ok(()) => Ok(ShimResult::Created),
             Err(err) => {
                 if err.kind() == io::ErrorKind::AlreadyExists {
                     Ok(ShimResult::AlreadyExists)

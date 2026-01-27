@@ -15,27 +15,24 @@ use crate::version::VersionSpec;
 use archive::{Archive, Tarball};
 use fs_utils::ensure_containing_dir_exists;
 use log::debug;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Npm>>) -> Fallible<()> {
     let npm_dir = volta_home()?.npm_inventory_dir();
     let cache_file = npm_dir.join(Npm::archive_filename(&version.to_string()));
 
-    let (archive, staging) = match load_cached_distro(&cache_file) {
-        Some(archive) => {
-            debug!(
-                "Loading {} from cached archive at '{}'",
-                tool_version("npm", version),
-                cache_file.display()
-            );
-            (archive, None)
-        }
-        None => {
-            let staging = create_staging_file()?;
-            let remote_url = determine_remote_url(version, hooks)?;
-            let archive = fetch_remote_distro(version, &remote_url, staging.path())?;
-            (archive, Some(staging))
-        }
+    let (archive, staging) = if let Some(archive) = load_cached_distro(&cache_file) {
+        debug!(
+            "Loading {} from cached archive at '{}'",
+            tool_version("npm", version),
+            cache_file.display()
+        );
+        (archive, None)
+    } else {
+        let staging = create_staging_file()?;
+        let remote_url = determine_remote_url(version, hooks)?;
+        let archive = fetch_remote_distro(version, &remote_url, staging.path())?;
+        (archive, Some(staging))
     };
 
     unpack_archive(archive, version)?;
@@ -67,7 +64,7 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
     let version_string = version.to_string();
 
     archive
-        .unpack(temp.path(), &mut |_, read| {
+        .unpack(temp.path(), &mut |(), read| {
             progress.inc(read as u64);
         })
         .with_context(|| ErrorKind::UnpackArchiveError {
@@ -160,12 +157,11 @@ case `uname` in
     *CYGWIN*) basedir=`cygpath -w "$basedir"`;;
 esac
 
-node "$basedir/{}-cli.js" "$@"
-"#,
-            tool
+node "$basedir/{tool}-cli.js" "$@"
+"#
         ),
     )
-    .and_then(|_| set_executable(&path))
+    .and_then(|()| set_executable(&path))
     .with_context(|| ErrorKind::WriteLauncherError { tool: tool.into() })
 }
 

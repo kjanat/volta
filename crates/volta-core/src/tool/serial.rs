@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use super::Spec;
 use crate::error::{ErrorKind, Fallible};
-use crate::version::{VersionSpec, VersionTag};
+use crate::version::{Tag, VersionSpec};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use validate_npm_package_name::{validate, Validity};
@@ -14,17 +14,22 @@ static HAS_VERSION: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[^\s]+@").expect("r
 
 /// Methods for parsing a Spec out of string values
 impl Spec {
+    #[must_use]
     pub fn from_str_and_version(tool_name: &str, version: VersionSpec) -> Self {
         match tool_name {
-            "node" => Spec::Node(version),
-            "npm" => Spec::Npm(version),
-            "pnpm" => Spec::Pnpm(version),
-            "yarn" => Spec::Yarn(version),
-            package => Spec::Package(package.to_string(), version),
+            "node" => Self::Node(version),
+            "npm" => Self::Npm(version),
+            "pnpm" => Self::Pnpm(version),
+            "yarn" => Self::Yarn(version),
+            package => Self::Package(package.to_string(), version),
         }
     }
 
-    /// Try to parse a tool and version from a string like `<tool>[@<version>].
+    /// Try to parse a tool and version from a string like `<tool>[@<version>]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool spec cannot be parsed.
     pub fn try_from_str(tool_spec: &str) -> Fallible<Self> {
         let captures =
             TOOL_SPEC_PATTERN
@@ -50,11 +55,11 @@ impl Spec {
             .unwrap_or_default();
 
         Ok(match name {
-            "node" => Spec::Node(version),
-            "npm" => Spec::Npm(version),
-            "pnpm" => Spec::Pnpm(version),
-            "yarn" => Spec::Yarn(version),
-            package => Spec::Package(package.into(), version),
+            "node" => Self::Node(version),
+            "npm" => Self::Npm(version),
+            "pnpm" => Self::Pnpm(version),
+            "yarn" => Self::Yarn(version),
+            package => Self::Package(package.into(), version),
         })
     }
 
@@ -68,7 +73,11 @@ impl Spec {
     ///
     /// Returns a listed sorted so that if `node` is included in the list, it is
     /// always first.
-    pub fn from_strings<T>(tool_strs: &[T], action: &str) -> Fallible<Vec<Spec>>
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any tool spec cannot be parsed.
+    pub fn from_strings<T>(tool_strs: &[T], action: &str) -> Fallible<Vec<Self>>
     where
         T: AsRef<str>,
     {
@@ -77,7 +86,7 @@ impl Spec {
         let mut tools = tool_strs
             .iter()
             .map(|arg| Self::try_from_str(arg.as_ref()))
-            .collect::<Fallible<Vec<Spec>>>()?;
+            .collect::<Fallible<Vec<Self>>>()?;
 
         tools.sort_by(Self::sort_comparator);
         Ok(tools)
@@ -134,21 +143,21 @@ impl Spec {
     /// We want to preserve the original order as much as possible, so we treat tools in
     /// the same tool category as equal. We still need to pull Node to the front of the
     /// list, followed by Npm, pnpm, Yarn, and then Packages last.
-    fn sort_comparator(left: &Spec, right: &Spec) -> Ordering {
+    const fn sort_comparator(left: &Self, right: &Self) -> Ordering {
         match (left, right) {
-            (Spec::Node(_), Spec::Node(_)) => Ordering::Equal,
-            (Spec::Node(_), _) => Ordering::Less,
-            (_, Spec::Node(_)) => Ordering::Greater,
-            (Spec::Npm(_), Spec::Npm(_)) => Ordering::Equal,
-            (Spec::Npm(_), _) => Ordering::Less,
-            (_, Spec::Npm(_)) => Ordering::Greater,
-            (Spec::Pnpm(_), Spec::Pnpm(_)) => Ordering::Equal,
-            (Spec::Pnpm(_), _) => Ordering::Less,
-            (_, Spec::Pnpm(_)) => Ordering::Greater,
-            (Spec::Yarn(_), Spec::Yarn(_)) => Ordering::Equal,
-            (Spec::Yarn(_), _) => Ordering::Less,
-            (_, Spec::Yarn(_)) => Ordering::Greater,
-            (Spec::Package(_, _), Spec::Package(_, _)) => Ordering::Equal,
+            (Self::Node(_), Self::Node(_))
+            | (Self::Npm(_), Self::Npm(_))
+            | (Self::Pnpm(_), Self::Pnpm(_))
+            | (Self::Yarn(_), Self::Yarn(_))
+            | (Self::Package(_, _), Self::Package(_, _)) => Ordering::Equal,
+            (Self::Node(_), _) => Ordering::Less,
+            (_, Self::Node(_)) => Ordering::Greater,
+            (Self::Npm(_), _) => Ordering::Less,
+            (_, Self::Npm(_)) => Ordering::Greater,
+            (Self::Pnpm(_), _) => Ordering::Less,
+            (_, Self::Pnpm(_)) => Ordering::Greater,
+            (Self::Yarn(_), _) => Ordering::Less,
+            (_, Self::Yarn(_)) => Ordering::Greater,
         }
     }
 }
@@ -159,10 +168,9 @@ impl Spec {
 fn is_version_like(value: &str) -> bool {
     matches!(
         value.parse(),
-        Ok(VersionSpec::Exact(_))
-            | Ok(VersionSpec::Semver(_))
-            | Ok(VersionSpec::Tag(VersionTag::Latest))
-            | Ok(VersionSpec::Tag(VersionTag::Lts))
+        Ok(VersionSpec::Exact(_)
+            | VersionSpec::Semver(_)
+            | VersionSpec::Tag(Tag::Latest | Tag::Lts))
     )
 }
 
@@ -172,7 +180,7 @@ mod tests {
         use std::str::FromStr as _;
 
         use super::super::super::Spec;
-        use crate::version::{VersionSpec, VersionTag};
+        use crate::version::{Tag, VersionSpec};
 
         const LTS: &str = "lts";
         const LATEST: &str = "latest";
@@ -217,12 +225,12 @@ mod tests {
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(tool, LATEST)).expect("succeeds"),
-                Spec::Node(VersionSpec::Tag(VersionTag::Latest))
+                Spec::Node(VersionSpec::Tag(Tag::Latest))
             );
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(tool, LTS)).expect("succeeds"),
-                Spec::Node(VersionSpec::Tag(VersionTag::Lts))
+                Spec::Node(VersionSpec::Tag(Tag::Lts))
             );
         }
 
@@ -255,7 +263,7 @@ mod tests {
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(tool, LATEST)).expect("succeeds"),
-                Spec::Yarn(VersionSpec::Tag(VersionTag::Latest))
+                Spec::Yarn(VersionSpec::Tag(Tag::Latest))
             );
         }
 
@@ -307,20 +315,17 @@ mod tests {
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(package, LATEST)).expect("succeeds"),
-                Spec::Package(package.into(), VersionSpec::Tag(VersionTag::Latest))
+                Spec::Package(package.into(), VersionSpec::Tag(Tag::Latest))
             );
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(package, LTS)).expect("succeeds"),
-                Spec::Package(package.into(), VersionSpec::Tag(VersionTag::Lts))
+                Spec::Package(package.into(), VersionSpec::Tag(Tag::Lts))
             );
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(package, BETA)).expect("succeeds"),
-                Spec::Package(
-                    package.into(),
-                    VersionSpec::Tag(VersionTag::Custom(BETA.into()))
-                )
+                Spec::Package(package.into(), VersionSpec::Tag(Tag::Custom(BETA.into())))
             );
         }
 
@@ -354,20 +359,17 @@ mod tests {
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(package, LATEST)).expect("succeeds"),
-                Spec::Package(package.into(), VersionSpec::Tag(VersionTag::Latest))
+                Spec::Package(package.into(), VersionSpec::Tag(Tag::Latest))
             );
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(package, LTS)).expect("succeeds"),
-                Spec::Package(package.into(), VersionSpec::Tag(VersionTag::Lts))
+                Spec::Package(package.into(), VersionSpec::Tag(Tag::Lts))
             );
 
             assert_eq!(
                 Spec::try_from_str(&versioned_tool!(package, BETA)).expect("succeeds"),
-                Spec::Package(
-                    package.into(),
-                    VersionSpec::Tag(VersionTag::Custom(BETA.into()))
-                )
+                Spec::Package(package.into(), VersionSpec::Tag(Tag::Custom(BETA.into())))
             );
         }
     }
@@ -476,7 +478,7 @@ mod tests {
                 "node@latest".to_owned(),
             ];
             let expected = [
-                Spec::Node(VersionSpec::Tag(VersionTag::Latest)),
+                Spec::Node(VersionSpec::Tag(Tag::Latest)),
                 Spec::Npm(VersionSpec::from_str("5").expect("requirement is valid")),
                 Spec::Yarn(VersionSpec::default()),
                 Spec::Package(
@@ -491,11 +493,8 @@ mod tests {
         fn keeps_package_order_unchanged() {
             let packages_with_node = ["typescript@latest", "ember-cli@3", "node@lts", "mocha"];
             let expected = [
-                Spec::Node(VersionSpec::Tag(VersionTag::Lts)),
-                Spec::Package(
-                    "typescript".to_owned(),
-                    VersionSpec::Tag(VersionTag::Latest),
-                ),
+                Spec::Node(VersionSpec::Tag(Tag::Lts)),
+                Spec::Package("typescript".to_owned(), VersionSpec::Tag(Tag::Latest)),
                 Spec::Package(
                     "ember-cli".to_owned(),
                     VersionSpec::from_str("3").expect("requirement is valid"),

@@ -11,7 +11,7 @@ use crate::style::{note_prefix, tool_version};
 use crate::sync::VoltaLock;
 use cfg_if::cfg_if;
 use log::info;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 mod fetch;
 mod metadata;
@@ -118,6 +118,7 @@ cfg_if! {
 /// but also the specific version of npm installed globally with that
 /// Node installation.
 #[derive(Clone, Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct NodeVersion {
     /// The version of Node itself.
     pub runtime: Version,
@@ -142,16 +143,18 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(version: Version) -> Self {
-        Node { version }
+    #[must_use]
+    pub const fn new(version: Version) -> Self {
+        Self { version }
     }
 
     #[cfg(not(any(
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "windows", target_arch = "aarch64")
     )))]
+    #[must_use]
     pub fn archive_basename(version: &Version) -> String {
-        format!("node-v{}-{}-{}", version, NODE_DISTRO_OS, NODE_DISTRO_ARCH)
+        format!("node-v{version}-{NODE_DISTRO_OS}-{NODE_DISTRO_ARCH}")
     }
 
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
@@ -186,15 +189,16 @@ impl Node {
         )
     }
 
+    #[must_use]
     pub fn archive_filename(version: &Version) -> String {
         format!(
             "{}.{}",
-            Node::archive_basename(version),
+            Self::archive_basename(version),
             NODE_DISTRO_EXTENSION
         )
     }
 
-    pub(crate) fn ensure_fetched(&self, session: &mut Session) -> Fallible<NodeVersion> {
+    pub(crate) fn ensure_fetched(&self, session: &Session) -> Fallible<NodeVersion> {
         match check_fetched(|| node_available(&self.version))? {
             FetchStatus::AlreadyFetched => {
                 debug_already_fetched(self);
@@ -236,7 +240,7 @@ impl Tool for Node {
       To use the version included with Node, run `volta install npm@bundled`",
                     note_prefix(),
                     tool_version("npm", node_version.npm),
-                    default_npm.to_string()
+                    default_npm
                 );
             }
         } else {
@@ -270,7 +274,7 @@ impl Tool for Node {
       To use the version included with Node, run `volta pin npm@bundled`",
                         note_prefix(),
                         tool_version("npm", node_version.npm),
-                        pinned_npm.to_string()
+                        pinned_npm
                     );
                 }
             } else {

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::version::version_serde;
-use node_semver::Version;
+use nodejs_semver::Version;
 use serde::Deserialize;
 
 /// The public Yarn index.
@@ -43,13 +43,13 @@ pub struct RawYarnAsset {
 }
 
 impl From<RawYarnIndex> for YarnIndex {
-    fn from(raw: RawYarnIndex) -> YarnIndex {
+    fn from(raw: RawYarnIndex) -> Self {
         let mut entries = BTreeSet::new();
         for entry in raw.0 {
             if entry.is_full_release() {
                 entries.insert(entry.tag_name);
             }
         }
-        YarnIndex { entries }
+        Self { entries }
     }
 }

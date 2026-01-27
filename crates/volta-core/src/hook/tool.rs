@@ -11,7 +11,7 @@ use crate::tool::{NODE_DISTRO_ARCH, NODE_DISTRO_OS};
 use cmdline_words_parser::parse_posix;
 use dunce::canonicalize;
 use log::debug;
-use node_semver::Version;
+use nodejs_semver::Version;
 use once_cell::sync::Lazy;
 
 const ARCH_TEMPLATE: &str = "{{arch}}";
@@ -37,14 +37,14 @@ impl DistroHook {
         let extension = calculate_extension(filename).unwrap_or("");
 
         match &self {
-            DistroHook::Prefix(prefix) => Ok(format!("{}{}", prefix, filename)),
-            DistroHook::Template(template) => Ok(template
+            Self::Prefix(prefix) => Ok(format!("{prefix}{filename}")),
+            Self::Template(template) => Ok(template
                 .replace(ARCH_TEMPLATE, NODE_DISTRO_ARCH)
                 .replace(OS_TEMPLATE, NODE_DISTRO_OS)
                 .replace(EXTENSION_TEMPLATE, extension)
                 .replace(FILENAME_TEMPLATE, filename)
                 .replace(VERSION_TEMPLATE, &version.to_string())),
-            DistroHook::Bin { bin, base_path } => {
+            Self::Bin { bin, base_path } => {
                 execute_binary(bin, base_path, Some(version.to_string()))
             }
         }
@@ -88,12 +88,12 @@ impl MetadataHook {
     /// Performs resolution of the metadata URL based on the given default file name
     pub fn resolve(&self, filename: &str) -> Fallible<String> {
         match &self {
-            MetadataHook::Prefix(prefix) => Ok(format!("{}{}", prefix, filename)),
-            MetadataHook::Template(template) => Ok(template
+            Self::Prefix(prefix) => Ok(format!("{prefix}{filename}")),
+            Self::Template(template) => Ok(template
                 .replace(ARCH_TEMPLATE, NODE_DISTRO_ARCH)
                 .replace(OS_TEMPLATE, NODE_DISTRO_OS)
                 .replace(FILENAME_TEMPLATE, filename)),
-            MetadataHook::Bin { bin, base_path } => execute_binary(bin, base_path, None),
+            Self::Bin { bin, base_path } => execute_binary(bin, base_path, None),
         }
     }
 }
@@ -109,7 +109,7 @@ impl YarnIndexHook {
     /// Performs resolution of the metadata URL based on the given default file name
     pub fn resolve(&self, filename: &str) -> Fallible<String> {
         match &self.metadata {
-            MetadataHook::Prefix(prefix) => Ok(format!("{}{}", prefix, filename)),
+            MetadataHook::Prefix(prefix) => Ok(format!("{prefix}{filename}")),
             MetadataHook::Template(template) => Ok(template
                 .replace(ARCH_TEMPLATE, NODE_DISTRO_ARCH)
                 .replace(OS_TEMPLATE, NODE_DISTRO_OS)
@@ -155,7 +155,7 @@ fn execute_binary(bin: &str, base_path: &Path, extra_arg: Option<String>) -> Fal
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
 
-    debug!("Running hook command: {:?}", command);
+    debug!("Running hook command: {command:?}");
     let output = command
         .output()
         .with_context(|| ErrorKind::ExecuteHookError {
@@ -180,7 +180,7 @@ fn execute_binary(bin: &str, base_path: &Path, extra_arg: Option<String>) -> Fal
 pub mod tests {
     use super::{calculate_extension, DistroHook, MetadataHook};
     use crate::tool::{NODE_DISTRO_ARCH, NODE_DISTRO_OS};
-    use node_semver::Version;
+    use nodejs_semver::Version;
 
     #[test]
     fn test_distro_prefix_resolve() {

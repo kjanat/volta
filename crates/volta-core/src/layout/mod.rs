@@ -20,6 +20,9 @@ cfg_if! {
 static VOLTA_HOME: OnceCell<VoltaHome> = OnceCell::new();
 static VOLTA_INSTALL: OnceCell<VoltaInstall> = OnceCell::new();
 
+/// # Errors
+///
+/// Returns an error if the Volta home directory cannot be determined.
 pub fn volta_home<'a>() -> Fallible<&'a VoltaHome> {
     VOLTA_HOME.get_or_try_init(|| {
         let home_dir = match env::var_os("VOLTA_HOME") {
@@ -31,6 +34,9 @@ pub fn volta_home<'a>() -> Fallible<&'a VoltaHome> {
     })
 }
 
+/// # Errors
+///
+/// Returns an error if the Volta install directory cannot be determined.
 pub fn volta_install<'a>() -> Fallible<&'a VoltaInstall> {
     VOLTA_INSTALL.get_or_try_init(|| {
         let install_dir = match env::var_os("VOLTA_INSTALL_DIR") {
@@ -46,7 +52,7 @@ pub fn volta_install<'a>() -> Fallible<&'a VoltaInstall> {
 ///
 /// The volta-shim and volta binaries will be installed in the same location, so we can use the
 /// currently running executable to find the binary install directory. Note that we need to
-/// canonicalize the path we get from current_exe to make sure we resolve symlinks and find the
+/// canonicalize the path we get from `current_exe` to make sure we resolve symlinks and find the
 /// actual binary files
 fn default_install_dir() -> Fallible<PathBuf> {
     env::current_exe()

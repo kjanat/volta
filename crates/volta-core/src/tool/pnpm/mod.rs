@@ -1,4 +1,4 @@
-use node_semver::Version;
+use nodejs_semver::Version;
 use std::fmt::{self, Display};
 
 use crate::error::{ErrorKind, Fallible};
@@ -23,19 +23,22 @@ pub struct Pnpm {
 }
 
 impl Pnpm {
-    pub fn new(version: Version) -> Self {
-        Pnpm { version }
+    #[must_use] 
+    pub const fn new(version: Version) -> Self {
+        Self { version }
     }
 
+    #[must_use] 
     pub fn archive_basename(version: &str) -> String {
-        format!("pnpm-{}", version)
+        format!("pnpm-{version}")
     }
 
+    #[must_use] 
     pub fn archive_filename(version: &str) -> String {
-        format!("{}.tgz", Pnpm::archive_basename(version))
+        format!("{}.tgz", Self::archive_basename(version))
     }
 
-    pub(crate) fn ensure_fetched(&self, session: &mut Session) -> Fallible<()> {
+    pub(crate) fn ensure_fetched(&self, session: &Session) -> Fallible<()> {
         match check_fetched(|| pnpm_available(&self.version))? {
             FetchStatus::AlreadyFetched => {
                 debug_already_fetched(self);
@@ -66,11 +69,10 @@ impl Tool for Pnpm {
         info_installed(&self);
         check_shim_reachable("pnpm");
 
-        if let Ok(Some(project)) = session.project_platform() {
-            if let Some(pnpm) = &project.pnpm {
+        if let Ok(Some(project)) = session.project_platform()
+            && let Some(pnpm) = &project.pnpm {
                 info_project_version(tool_version("pnpm", pnpm), &self);
             }
-        }
         Ok(())
     }
 

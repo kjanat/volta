@@ -6,7 +6,7 @@ use std::path::Path;
 use archive::{Archive, Tarball};
 use fs_utils::ensure_containing_dir_exists;
 use log::debug;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 use crate::error::{Context, ErrorKind, Fallible};
 use crate::fs::{create_staging_dir, create_staging_file, rename, set_executable};
@@ -21,21 +21,18 @@ pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible<()>
     let pnpm_dir = volta_home()?.pnpm_inventory_dir();
     let cache_file = pnpm_dir.join(Pnpm::archive_filename(&version.to_string()));
 
-    let (archive, staging) = match load_cached_distro(&cache_file) {
-        Some(archive) => {
-            debug!(
-                "Loading {} from cached archive at '{}'",
-                tool_version("pnpm", version),
-                cache_file.display(),
-            );
-            (archive, None)
-        }
-        None => {
-            let staging = create_staging_file()?;
-            let remote_url = determine_remote_url(version, hooks)?;
-            let archive = fetch_remote_distro(version, &remote_url, staging.path())?;
-            (archive, Some(staging))
-        }
+    let (archive, staging) = if let Some(archive) = load_cached_distro(&cache_file) {
+        debug!(
+            "Loading {} from cached archive at '{}'",
+            tool_version("pnpm", version),
+            cache_file.display(),
+        );
+        (archive, None)
+    } else {
+        let staging = create_staging_file()?;
+        let remote_url = determine_remote_url(version, hooks)?;
+        let archive = fetch_remote_distro(version, &remote_url, staging.path())?;
+        (archive, Some(staging))
     };
 
     unpack_archive(archive, version)?;
@@ -69,7 +66,7 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
     let version_string = version.to_string();
 
     archive
-        .unpack(temp.path(), &mut |_, read| {
+        .unpack(temp.path(), &mut |(), read| {
             progress.inc(read as u64);
         })
         .with_context(|| ErrorKind::UnpackArchiveError {
@@ -161,12 +158,11 @@ case `uname` in
     *CYGWIN*) basedir=`cygpath -w "$basedir"`;;
 esac
 
-node "$basedir/{}.cjs" "$@"
-"#,
-            tool
+node "$basedir/{tool}.cjs" "$@"
+"#
         ),
     )
-    .and_then(|_| set_executable(&path))
+    .and_then(|()| set_executable(&path))
     .with_context(|| ErrorKind::WriteLauncherError { tool: tool.into() })
 }
 

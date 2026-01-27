@@ -9,6 +9,9 @@ pub(super) fn default_home_dir() -> Fallible<PathBuf> {
     Ok(home)
 }
 
+/// # Errors
+///
+/// Returns an error if the Volta home directory cannot be determined.
 pub fn env_paths() -> Fallible<Vec<PathBuf>> {
     let home = volta_home()?;
     Ok(vec![home.shim_dir().to_owned()])

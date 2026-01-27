@@ -10,12 +10,12 @@ use crate::hook::ToolHooks;
 use crate::layout::volta_home;
 use crate::style::{progress_bar, tool_version};
 use crate::tool::{self, download_tool_error, Node};
-use crate::version::{parse_version, VersionSpec};
+use crate::version::{parse, VersionSpec};
 use archive::{self, Archive};
 use cfg_if::cfg_if;
 use fs_utils::ensure_containing_dir_exists;
 use log::debug;
-use node_semver::Version;
+use nodejs_semver::Version;
 use serde::Deserialize;
 
 cfg_if! {
@@ -52,21 +52,18 @@ pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Node>>) -> Fallible<Nod
     let node_dir = home.node_inventory_dir();
     let cache_file = node_dir.join(Node::archive_filename(version));
 
-    let (archive, staging) = match load_cached_distro(&cache_file) {
-        Some(archive) => {
-            debug!(
-                "Loading {} from cached archive at '{}'",
-                tool_version("node", version),
-                cache_file.display()
-            );
-            (archive, None)
-        }
-        None => {
-            let staging = create_staging_file()?;
-            let remote_url = determine_remote_url(version, hooks)?;
-            let archive = fetch_remote_distro(version, &remote_url, staging.path())?;
-            (archive, Some(staging))
-        }
+    let (archive, staging) = if let Some(archive) = load_cached_distro(&cache_file) {
+        debug!(
+            "Loading {} from cached archive at '{}'",
+            tool_version("node", version),
+            cache_file.display()
+        );
+        (archive, None)
+    } else {
+        let staging = create_staging_file()?;
+        let remote_url = determine_remote_url(version, hooks)?;
+        let archive = fetch_remote_distro(version, &remote_url, staging.path())?;
+        (archive, Some(staging))
     };
 
     let node_version = unpack_archive(archive, version)?;
@@ -100,7 +97,7 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<Node
     let version_string = version.to_string();
 
     archive
-        .unpack(temp.path(), &mut |_, read| {
+        .unpack(temp.path(), &mut |(), read| {
             progress.inc(read as u64);
         })
         .with_context(|| ErrorKind::UnpackArchiveError {
@@ -128,7 +125,7 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<Node
     progress.finish_and_clear();
 
     // Note: We write these after the progress bar is finished to avoid display bugs with re-renders of the progress
-    debug!("Saving bundled npm version ({})", npm);
+    debug!("Saving bundled npm version ({npm})");
     debug!("Installing node in '{}'", dest.display());
 
     Ok(NodeVersion {
@@ -192,20 +189,24 @@ impl Manifest {
     /// Parse the version out of a package.json file
     fn version(path: &Path) -> Fallible<Version> {
         let file = File::open(path).with_context(|| ErrorKind::ReadNpmManifestError)?;
-        let manifest: Manifest =
+        let manifest: Self =
             serde_json::de::from_reader(file).with_context(|| ErrorKind::ParseNpmManifestError)?;
-        parse_version(manifest.version)
+        parse(manifest.version)
     }
 }
 
 /// Load the local npm version file to determine the default npm version for a given version of Node
+///
+/// # Errors
+///
+/// Returns an error if the npm version file cannot be read or parsed.
 pub fn load_default_npm_version(node: &Version) -> Fallible<Version> {
     let npm_version_file_path = volta_home()?.node_npm_version_file(&node.to_string());
     let npm_version =
         read_to_string(&npm_version_file_path).with_context(|| ErrorKind::ReadDefaultNpmError {
             file: npm_version_file_path,
         })?;
-    parse_version(npm_version)
+    parse(npm_version)
 }
 
 /// Save the default npm version to the filesystem for a given version of Node

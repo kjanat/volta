@@ -10,7 +10,7 @@ use super::RECURSION_ENV_VAR;
 use crate::command::create_command;
 use crate::error::{Context, ErrorKind, Fallible};
 use crate::layout::volta_home;
-use crate::platform::{CliPlatform, Platform, System};
+use crate::platform::{Overrides, Platform, System};
 use crate::session::Session;
 use crate::signal::pass_control_to_shim;
 use crate::style::{note_prefix, tool_version};
@@ -26,7 +26,7 @@ pub enum Executor {
     PackageUpgrade(Box<PackageUpgradeCommand>),
     InternalInstall(Box<InternalInstallCommand>),
     Uninstall(Box<UninstallCommand>),
-    Multiple(Vec<Executor>),
+    Multiple(Vec<Self>),
 }
 
 impl Executor {
@@ -36,15 +36,13 @@ impl Executor {
         V: AsRef<OsStr>,
     {
         match self {
-            Executor::Tool(cmd) => cmd.envs(envs),
-            Executor::PackageInstall(cmd) => cmd.envs(envs),
-            Executor::PackageLink(cmd) => cmd.envs(envs),
-            Executor::PackageUpgrade(cmd) => cmd.envs(envs),
-            // Internal installs use Volta's logic and don't rely on the environment variables
-            Executor::InternalInstall(_) => {}
-            // Uninstalls use Volta's logic and don't rely on environment variables
-            Executor::Uninstall(_) => {}
-            Executor::Multiple(executors) => {
+            Self::Tool(cmd) => cmd.envs(envs),
+            Self::PackageInstall(cmd) => cmd.envs(envs),
+            Self::PackageLink(cmd) => cmd.envs(envs),
+            Self::PackageUpgrade(cmd) => cmd.envs(envs),
+            // Internal installs and uninstalls use Volta's logic and don't rely on environment variables
+            Self::InternalInstall(_) | Self::Uninstall(_) => {}
+            Self::Multiple(executors) => {
                 for exe in executors {
                     exe.envs(envs);
                 }
@@ -52,17 +50,15 @@ impl Executor {
         }
     }
 
-    pub fn cli_platform(&mut self, cli: CliPlatform) {
+    pub fn cli_platform(&mut self, cli: Overrides) {
         match self {
-            Executor::Tool(cmd) => cmd.cli_platform(cli),
-            Executor::PackageInstall(cmd) => cmd.cli_platform(cli),
-            Executor::PackageLink(cmd) => cmd.cli_platform(cli),
-            Executor::PackageUpgrade(cmd) => cmd.cli_platform(cli),
-            // Internal installs use Volta's logic and don't rely on the Node platform
-            Executor::InternalInstall(_) => {}
-            // Uninstall use Volta's logic and don't rely on the Node platform
-            Executor::Uninstall(_) => {}
-            Executor::Multiple(executors) => {
+            Self::Tool(cmd) => cmd.cli_platform(cli),
+            Self::PackageInstall(cmd) => cmd.cli_platform(cli),
+            Self::PackageLink(cmd) => cmd.cli_platform(cli),
+            Self::PackageUpgrade(cmd) => cmd.cli_platform(cli),
+            // Internal installs and uninstalls use Volta's logic and don't rely on the Node platform
+            Self::InternalInstall(_) | Self::Uninstall(_) => {}
+            Self::Multiple(executors) => {
                 for exe in executors {
                     exe.cli_platform(cli.clone());
                 }
@@ -72,13 +68,13 @@ impl Executor {
 
     pub fn execute(self, session: &mut Session) -> Fallible<ExitStatus> {
         match self {
-            Executor::Tool(cmd) => cmd.execute(session),
-            Executor::PackageInstall(cmd) => cmd.execute(session),
-            Executor::PackageLink(cmd) => cmd.execute(session),
-            Executor::PackageUpgrade(cmd) => cmd.execute(session),
-            Executor::InternalInstall(cmd) => cmd.execute(session),
-            Executor::Uninstall(cmd) => cmd.execute(),
-            Executor::Multiple(executors) => {
+            Self::Tool(cmd) => cmd.execute(session),
+            Self::PackageInstall(cmd) => cmd.execute(session),
+            Self::PackageLink(cmd) => cmd.execute(session),
+            Self::PackageUpgrade(cmd) => cmd.execute(session),
+            Self::InternalInstall(cmd) => cmd.execute(session),
+            Self::Uninstall(cmd) => cmd.execute(),
+            Self::Multiple(executors) => {
                 info!(
                     "{} Volta is processing each package separately",
                     note_prefix()
@@ -98,12 +94,16 @@ impl Executor {
     }
 }
 
-impl From<Vec<Executor>> for Executor {
-    fn from(mut executors: Vec<Executor>) -> Self {
-        if executors.len() == 1 {
-            executors.pop().unwrap()
-        } else {
-            Executor::Multiple(executors)
+impl From<Vec<Self>> for Executor {
+    fn from(executors: Vec<Self>) -> Self {
+        let mut iter = executors.into_iter();
+        match (iter.next(), iter.next()) {
+            (Some(single), None) => single,
+            (first, second) => {
+                // Reconstruct the vec from remaining items
+                let rest: Vec<_> = first.into_iter().chain(second).chain(iter).collect();
+                Self::Multiple(rest)
+            }
         }
     }
 }
@@ -167,7 +167,7 @@ impl ToolCommand {
     }
 
     /// Updates the Platform for the command to include values from the command-line
-    pub fn cli_platform(&mut self, cli: CliPlatform) {
+    pub fn cli_platform(&mut self, cli: Overrides) {
         self.platform = match self.platform.take() {
             Some(base) => Some(cli.merge(base)),
             None => cli.into(),
@@ -201,7 +201,7 @@ impl ToolCommand {
 
 impl From<ToolCommand> for Executor {
     fn from(cmd: ToolCommand) -> Self {
-        Executor::Tool(Box::new(cmd))
+        Self::Tool(Box::new(cmd))
     }
 }
 
@@ -233,7 +233,7 @@ impl PackageInstallCommand {
         };
         command.args(args);
 
-        Ok(PackageInstallCommand {
+        Ok(Self {
             command,
             installer,
             platform,
@@ -250,7 +250,7 @@ impl PackageInstallCommand {
         let mut command = create_command("npm");
         command.args(args);
 
-        Ok(PackageInstallCommand {
+        Ok(Self {
             command,
             installer,
             platform,
@@ -268,7 +268,7 @@ impl PackageInstallCommand {
     }
 
     /// Updates the Platform for the command to include values from the command-line
-    pub fn cli_platform(&mut self, cli: CliPlatform) {
+    pub fn cli_platform(&mut self, cli: Overrides) {
         self.platform = cli.merge(self.platform.clone());
     }
 
@@ -298,7 +298,7 @@ impl PackageInstallCommand {
 
 impl From<PackageInstallCommand> for Executor {
     fn from(cmd: PackageInstallCommand) -> Self {
-        Executor::PackageInstall(Box::new(cmd))
+        Self::PackageInstall(Box::new(cmd))
     }
 }
 
@@ -324,7 +324,7 @@ impl PackageLinkCommand {
         let mut command = create_command("npm");
         command.args(args);
 
-        PackageLinkCommand {
+        Self {
             command,
             tool,
             platform,
@@ -342,7 +342,7 @@ impl PackageLinkCommand {
     }
 
     /// Updates the Platform for the command to include values from the command-line
-    pub fn cli_platform(&mut self, cli: CliPlatform) {
+    pub fn cli_platform(&mut self, cli: Overrides) {
         self.platform = cli.merge(self.platform.clone());
     }
 
@@ -370,7 +370,7 @@ impl PackageLinkCommand {
     ///     - The package is not found as a global
     ///     - The package exists, but was linked using a different package manager
     ///     - The package is using a different version of Node than the current project (warning)
-    fn check_linked_package(&self, session: &mut Session) -> Fallible<()> {
+    fn check_linked_package(&self, session: &Session) -> Fallible<()> {
         let config =
             PackageConfig::from_file(volta_home()?.default_package_config_file(&self.tool))
                 .with_context(|| ErrorKind::NpmLinkMissingPackage {
@@ -384,8 +384,8 @@ impl PackageLinkCommand {
             .into());
         }
 
-        if let Some(platform) = session.project_platform()? {
-            if platform.node.major != config.platform.node.major {
+        if let Some(platform) = session.project_platform()?
+            && platform.node.major != config.platform.node.major {
                 warn!(
                     "the current project is using {}, but package '{}' was linked using {}. These might not interact correctly.",
                     tool_version("node", &platform.node),
@@ -393,7 +393,6 @@ impl PackageLinkCommand {
                     tool_version("node", &config.platform.node)
                 );
             }
-        }
 
         Ok(())
     }
@@ -401,7 +400,7 @@ impl PackageLinkCommand {
 
 impl From<PackageLinkCommand> for Executor {
     fn from(cmd: PackageLinkCommand) -> Self {
-        Executor::PackageLink(Box::new(cmd))
+        Self::PackageLink(Box::new(cmd))
     }
 }
 
@@ -438,7 +437,7 @@ impl PackageUpgradeCommand {
         };
         command.args(args);
 
-        Ok(PackageUpgradeCommand {
+        Ok(Self {
             command,
             upgrader,
             platform,
@@ -456,7 +455,7 @@ impl PackageUpgradeCommand {
     }
 
     /// Updates the Platform for the command to include values from the command-line
-    pub fn cli_platform(&mut self, cli: CliPlatform) {
+    pub fn cli_platform(&mut self, cli: Overrides) {
         self.platform = cli.merge(self.platform.clone());
     }
 
@@ -491,7 +490,7 @@ impl PackageUpgradeCommand {
 
 impl From<PackageUpgradeCommand> for Executor {
     fn from(cmd: PackageUpgradeCommand) -> Self {
-        Executor::PackageUpgrade(Box::new(cmd))
+        Self::PackageUpgrade(Box::new(cmd))
     }
 }
 
@@ -505,8 +504,8 @@ pub struct InternalInstallCommand {
 }
 
 impl InternalInstallCommand {
-    pub fn new(tool: Spec) -> Self {
-        InternalInstallCommand { tool }
+    pub const fn new(tool: Spec) -> Self {
+        Self { tool }
     }
 
     /// Runs the install, using Volta's internal install logic for the appropriate tool
@@ -525,7 +524,7 @@ impl InternalInstallCommand {
 
 impl From<InternalInstallCommand> for Executor {
     fn from(cmd: InternalInstallCommand) -> Self {
-        Executor::InternalInstall(Box::new(cmd))
+        Self::InternalInstall(Box::new(cmd))
     }
 }
 
@@ -538,8 +537,8 @@ pub struct UninstallCommand {
 }
 
 impl UninstallCommand {
-    pub fn new(tool: Spec) -> Self {
-        UninstallCommand { tool }
+    pub const fn new(tool: Spec) -> Self {
+        Self { tool }
     }
 
     /// Runs the uninstall with Volta's internal uninstall logic
@@ -558,6 +557,6 @@ impl UninstallCommand {
 
 impl From<UninstallCommand> for Executor {
     fn from(cmd: UninstallCommand) -> Self {
-        Executor::Uninstall(Box::new(cmd))
+        Self::Uninstall(Box::new(cmd))
     }
 }

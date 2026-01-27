@@ -22,7 +22,9 @@ mod manager;
 mod metadata;
 mod uninstall;
 
+#[allow(clippy::module_name_repetitions)]
 pub use manager::PackageManager;
+#[allow(clippy::module_name_repetitions)]
 pub use metadata::{BinConfig, PackageConfig, PackageManifest};
 pub use uninstall::uninstall;
 
@@ -34,16 +36,22 @@ pub struct Package {
 }
 
 impl Package {
+    /// # Errors
+    ///
+    /// Returns an error if the staging directory cannot be created.
     pub fn new(name: String, version: VersionSpec) -> Fallible<Self> {
         let staging = setup_staging_directory(PackageManager::Npm, NeedsScope::No)?;
 
-        Ok(Package {
+        Ok(Self {
             name,
             version,
             staging,
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the install fails.
     pub fn run_install(&self, platform_image: &Image) -> Fallible<()> {
         install::run_global_install(
             self.to_string(),
@@ -52,6 +60,9 @@ impl Package {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the install cannot be completed.
     pub fn complete_install(self, image: &Image) -> Fallible<PackageManifest> {
         let manager = PackageManager::Npm;
         let manifest =
@@ -133,20 +144,26 @@ pub struct DirectInstall {
 }
 
 impl DirectInstall {
+    /// # Errors
+    ///
+    /// Returns an error if the staging directory cannot be created.
     pub fn new(manager: PackageManager) -> Fallible<Self> {
         let staging = setup_staging_directory(manager, NeedsScope::No)?;
 
-        Ok(DirectInstall {
+        Ok(Self {
             staging,
             manager,
             name: None,
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the staging directory cannot be created.
     pub fn with_name(manager: PackageManager, name: String) -> Fallible<Self> {
         let staging = setup_staging_directory(manager, name.contains('/').into())?;
 
-        Ok(DirectInstall {
+        Ok(Self {
             staging,
             manager,
             name: Some(name),
@@ -158,8 +175,11 @@ impl DirectInstall {
             .setup_global_command(command, self.staging.path().to_owned());
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the install cannot be completed.
     pub fn complete_install(self, image: &Image) -> Fallible<()> {
-        let DirectInstall {
+        let Self {
             staging,
             name,
             manager,
@@ -186,6 +206,9 @@ pub struct InPlaceUpgrade {
 }
 
 impl InPlaceUpgrade {
+    /// # Errors
+    ///
+    /// Returns an error if the Volta home directory cannot be determined.
     pub fn new(package: String, manager: PackageManager) -> Fallible<Self> {
         let directory = volta_home()?.package_image_dir(&package);
 
@@ -199,6 +222,10 @@ impl InPlaceUpgrade {
     /// Check for possible failure cases with the package to be upgraded
     ///     - The package is not installed as a global
     ///     - The package exists, but was installed with a different package manager
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the package is not found or was installed with a different manager.
     pub fn check_upgraded_package(&self) -> Fallible<()> {
         let config =
             PackageConfig::from_file(volta_home()?.default_package_config_file(&self.package))
@@ -207,14 +234,14 @@ impl InPlaceUpgrade {
                     manager: self.manager,
                 })?;
 
-        if config.manager != self.manager {
+        if config.manager == self.manager {
+            Ok(())
+        } else {
             Err(ErrorKind::UpgradePackageWrongManager {
                 package: self.package.clone(),
                 manager: config.manager,
             }
             .into())
-        } else {
-            Ok(())
         }
     }
 
@@ -223,6 +250,9 @@ impl InPlaceUpgrade {
             .setup_global_command(command, self.directory.clone());
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the upgrade cannot be completed.
     pub fn complete_upgrade(self, image: &Image) -> Fallible<()> {
         let manifest = configure::parse_manifest(&self.package, self.directory, self.manager)?;
 
@@ -240,9 +270,9 @@ enum NeedsScope {
 impl From<bool> for NeedsScope {
     fn from(value: bool) -> Self {
         if value {
-            NeedsScope::Yes
+            Self::Yes
         } else {
-            NeedsScope::No
+            Self::No
         }
     }
 }
@@ -293,7 +323,7 @@ where
 
     // Handle scoped packages (@vue/cli), which have an extra directory for the scope
     ensure_containing_dir_exists(&package_dir).with_context(|| ErrorKind::ContainingDirError {
-        path: package_dir.to_owned(),
+        path: package_dir.clone(),
     })?;
 
     rename(staging_dir, &package_dir).with_context(|| ErrorKind::SetupToolImageError {

@@ -11,7 +11,7 @@ use crate::session::Session;
 use crate::style::{success_prefix, tool_version};
 use crate::sync::VoltaLock;
 use log::info;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 mod fetch;
 mod resolve;
@@ -24,19 +24,22 @@ pub struct Npm {
 }
 
 impl Npm {
-    pub fn new(version: Version) -> Self {
-        Npm { version }
+    #[must_use] 
+    pub const fn new(version: Version) -> Self {
+        Self { version }
     }
 
+    #[must_use] 
     pub fn archive_basename(version: &str) -> String {
-        format!("npm-{}", version)
+        format!("npm-{version}")
     }
 
+    #[must_use] 
     pub fn archive_filename(version: &str) -> String {
-        format!("{}.tgz", Npm::archive_basename(version))
+        format!("{}.tgz", Self::archive_basename(version))
     }
 
-    pub(crate) fn ensure_fetched(&self, session: &mut Session) -> Fallible<()> {
+    pub(crate) fn ensure_fetched(&self, session: &Session) -> Fallible<()> {
         match check_fetched(|| npm_available(&self.version))? {
             FetchStatus::AlreadyFetched => {
                 debug_already_fetched(self);
@@ -66,11 +69,10 @@ impl Tool for Npm {
         info_installed(&self);
         check_shim_reachable("npm");
 
-        if let Ok(Some(project)) = session.project_platform() {
-            if let Some(npm) = &project.npm {
+        if let Ok(Some(project)) = session.project_platform()
+            && let Some(npm) = &project.npm {
                 info_project_version(tool_version("npm", npm), &self);
             }
-        }
         Ok(())
     }
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {
@@ -96,9 +98,9 @@ impl Display for Npm {
 }
 
 /// The Tool implementation for setting npm to the version bundled with Node
-pub struct BundledNpm;
+pub struct Bundled;
 
-impl Tool for BundledNpm {
+impl Tool for Bundled {
     fn fetch(self: Box<Self>, _session: &mut Session) -> Fallible<()> {
         info!("Bundled npm is included with Node, use `volta fetch node` to fetch Node");
         Ok(())
@@ -171,7 +173,7 @@ impl Tool for BundledNpm {
     }
 }
 
-impl Display for BundledNpm {
+impl Display for Bundled {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&tool_version("npm", "bundled"))
     }

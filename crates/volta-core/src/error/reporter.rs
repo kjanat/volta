@@ -1,4 +1,4 @@
-use std::env::args_os;
+use std::env::{args_os, var_os};
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
@@ -8,30 +8,37 @@ use super::VoltaError;
 use crate::layout::volta_home;
 use crate::style::format_error_cause;
 use chrono::Local;
-use ci_info::is_ci;
 use console::strip_ansi_codes;
 use fs_utils::ensure_containing_dir_exists;
 use log::{debug, error};
 
+/// Returns true if running in a CI environment.
+///
+/// Detects CI by checking for the `CI` environment variable, which is set by
+/// most CI providers (GitHub Actions, GitLab CI, `CircleCI`, Travis, etc.).
+fn is_ci() -> bool {
+    var_os("CI").is_some()
+}
+
 /// Report an error, both to the console and to error logs
 pub fn report_error(volta_version: &str, err: &VoltaError) {
     let message = err.to_string();
-    error!("{}", message);
+    error!("{message}");
 
     if let Some(details) = compose_error_details(err) {
         if is_ci() {
             // In CI, we write the error details to the log so that they are available in the CI logs
             // A log file may not even exist by the time the user is reviewing a failure
-            error!("{}", details);
+            error!("{details}");
         } else {
             // Outside of CI, we write the error details as Debug (Verbose) information
             // And we write an actual error log that the user can review
-            debug!("{}", details);
+            debug!("{details}");
 
             // Note: Writing the error log info directly to stderr as it is a message for the user
             // Any custom logs will have all of the details already, so showing a message about writing
             // the error log would be redundant
-            match write_error_log(volta_version, message, details) {
+            match write_error_log(volta_version, &message, &details) {
                 Ok(log_file) => {
                     eprintln!("Error details written to {}", log_file.to_string_lossy());
                 }
@@ -46,8 +53,8 @@ pub fn report_error(volta_version: &str, err: &VoltaError) {
 /// Write an error log with all details about the error
 fn write_error_log(
     volta_version: &str,
-    message: String,
-    details: String,
+    message: &str,
+    details: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let file_name = Local::now()
         .format("volta-error-%Y-%m-%d_%H_%M_%S%.3f.log")
@@ -58,11 +65,11 @@ fn write_error_log(
     let mut log_file = File::create(&log_file_path)?;
 
     writeln!(log_file, "{}", collect_arguments())?;
-    writeln!(log_file, "Volta v{}", volta_version)?;
+    writeln!(log_file, "Volta v{volta_version}")?;
     writeln!(log_file)?;
-    writeln!(log_file, "{}", strip_ansi_codes(&message))?;
+    writeln!(log_file, "{}", strip_ansi_codes(message))?;
     writeln!(log_file)?;
-    writeln!(log_file, "{}", strip_ansi_codes(&details))?;
+    writeln!(log_file, "{}", strip_ansi_codes(details))?;
 
     Ok(log_file_path)
 }
@@ -84,7 +91,7 @@ fn compose_error_details(err: &VoltaError) -> Option<String> {
             None => {
                 break;
             }
-        };
+        }
     }
 
     Some(details)
@@ -92,9 +99,16 @@ fn compose_error_details(err: &VoltaError) -> Option<String> {
 
 /// Combines all the arguments into a single String
 fn collect_arguments() -> String {
-    // The Debug formatter for OsString properly quotes and escapes each value
+    // Quote arguments that contain spaces or special characters
     args_os()
-        .map(|arg| format!("{:?}", arg))
+        .map(|arg| {
+            let s = arg.to_string_lossy();
+            if s.contains(' ') || s.contains('"') || s.contains('\'') {
+                format!("\"{}\"", s.replace('"', "\\\""))
+            } else {
+                s.into_owned()
+            }
+        })
         .collect::<Vec<String>>()
         .join(" ")
 }

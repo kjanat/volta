@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::Path;
 
-use node_semver::Version;
+use nodejs_semver::Version;
 use volta_core::platform::PlatformSpec;
 use volta_core::version::{option_version_serde, version_serde};
 
@@ -11,6 +11,7 @@ pub struct LegacyPackageConfig {
     #[serde(with = "version_serde")]
     pub version: Version,
     pub platform: LegacyPlatform,
+    #[allow(dead_code)]
     pub bins: Vec<String>,
 }
 
@@ -39,7 +40,7 @@ impl LegacyPackageConfig {
 
 impl From<LegacyPlatform> for PlatformSpec {
     fn from(config_platform: LegacyPlatform) -> Self {
-        PlatformSpec {
+        Self {
             node: config_platform.node.runtime,
             npm: config_platform.node.npm,
             // LegacyPlatform (layout.v2) doesn't have a pnpm field

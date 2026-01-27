@@ -9,7 +9,7 @@ use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
 use crate::version::{option_version_serde, version_serde};
 use fs_utils::ensure_containing_dir_exists;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 /// Configuration information about an installed package
 ///
@@ -32,6 +32,10 @@ pub struct PackageConfig {
 
 impl PackageConfig {
     /// Parse a `PackageConfig` instance from a config file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or parsed.
     pub fn from_file<P>(file: P) -> Fallible<Self>
     where
         P: AsRef<Path>,
@@ -42,6 +46,9 @@ impl PackageConfig {
         serde_json::from_reader(config).with_context(|| ErrorKind::ParsePackageConfigError)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the file exists but cannot be read or parsed.
     pub fn from_file_if_exists<P>(file: P) -> Fallible<Option<Self>>
     where
         P: AsRef<Path>,
@@ -66,6 +73,10 @@ impl PackageConfig {
     }
 
     /// Write this `PackageConfig` into the appropriate config file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the config file cannot be written.
     pub fn write(self) -> Fallible<()> {
         let config_file_path = volta_home()?.default_package_config_file(&self.name);
 
@@ -87,7 +98,7 @@ impl PackageConfig {
 
 /// Configuration information about a single installed binary from a package
 ///
-/// Will be stored in <VOLTA_HOME>/tools/user/bins/<bin-name>.json
+/// Will be stored in <`VOLTA_HOME>/tools/user/bins`/<bin-name>.json
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct BinConfig {
     /// The binary name
@@ -106,6 +117,10 @@ pub struct BinConfig {
 
 impl BinConfig {
     /// Parse a `BinConfig` instance from the given config file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or parsed.
     pub fn from_file<P>(file: P) -> Fallible<Self>
     where
         P: AsRef<Path>,
@@ -116,6 +131,9 @@ impl BinConfig {
         serde_json::from_reader(config).with_context(|| ErrorKind::ParseBinConfigError)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the file exists but cannot be read or parsed.
     pub fn from_file_if_exists<P>(file: P) -> Fallible<Option<Self>>
     where
         P: AsRef<Path>,
@@ -140,6 +158,10 @@ impl BinConfig {
     }
 
     /// Write this `BinConfig` to the appropriate config file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the config file cannot be written.
     pub fn write(self) -> Fallible<()> {
         let config_file_path = volta_home()?.default_tool_bin_config(&self.name);
 
@@ -194,6 +216,10 @@ pub struct PackageManifest {
 
 impl PackageManifest {
     /// Parse the `package.json` for a given package directory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest cannot be read or parsed.
     pub fn for_dir(package: &str, package_root: &Path) -> Fallible<Self> {
         let package_file = package_root.join("package.json");
         let file =

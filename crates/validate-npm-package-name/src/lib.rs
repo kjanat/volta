@@ -1,7 +1,6 @@
 //! A Rust implementation of the validation rules from the core JS package
 //! [`validate-npm-package-name`](https://github.com/npm/validate-npm-package-name/).
 
-use once_cell::sync::Lazy;
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use regex::Regex;
 
@@ -18,9 +17,9 @@ static ENCODE_URI_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'(')
     .remove(b')');
 
-static SCOPED_PACKAGE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(?:@([^/]+?)[/])?([^/]+?)$").expect("regex is valid"));
-static SPECIAL_CHARS: Lazy<Regex> = Lazy::new(|| Regex::new(r"[~'!()*]").expect("regex is valid"));
+static SCOPED_PACKAGE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"^(?:@([^/]+?)[/])?([^/]+?)$").expect("regex is valid"));
+static SPECIAL_CHARS: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"[~'!()*]").expect("regex is valid"));
 const BLACKLIST: [&str; 2] = ["node_modules", "favicon.ico"];
 
 // Borrowed from https://github.com/juliangruber/builtins
@@ -83,12 +82,14 @@ pub enum Validity {
 }
 
 impl Validity {
-    pub fn valid_for_old_packages(&self) -> bool {
-        matches!(self, Validity::Valid | Validity::ValidForOldPackages { .. })
+    #[must_use] 
+    pub const fn valid_for_old_packages(&self) -> bool {
+        matches!(self, Self::Valid | Self::ValidForOldPackages { .. })
     }
 
-    pub fn valid_for_new_packages(&self) -> bool {
-        matches!(self, Validity::Valid)
+    #[must_use] 
+    pub const fn valid_for_new_packages(&self) -> bool {
+        matches!(self, Self::Valid)
     }
 }
 
@@ -113,17 +114,17 @@ pub fn validate(name: &str) -> Validity {
     }
 
     // No funny business
-    for blacklisted_name in BLACKLIST.iter() {
+    for blacklisted_name in &BLACKLIST {
         if &name.to_lowercase() == blacklisted_name {
-            errors.push(format!("{} is a blacklisted name", blacklisted_name));
+            errors.push(format!("{blacklisted_name} is a blacklisted name"));
         }
     }
 
     // Generate warnings for stuff that used to be allowed
 
-    for builtin in BUILTINS.iter() {
+    for builtin in &BUILTINS {
         if name.to_lowercase() == *builtin {
-            warnings.push(format!("{} is a core module name", builtin));
+            warnings.push(format!("{builtin} is a core module name"));
         }
     }
 
@@ -140,9 +141,8 @@ pub fn validate(name: &str) -> Validity {
 
     if name
         .split('/')
-        .last()
-        .map(|final_part| SPECIAL_CHARS.is_match(final_part))
-        .unwrap_or(false)
+        .next_back()
+        .is_some_and(|final_part| SPECIAL_CHARS.is_match(final_part))
     {
         warnings.push(r#"name can no longer contain special characters ("~\'!()*")"#.into());
     }
@@ -153,14 +153,12 @@ pub fn validate(name: &str) -> Validity {
             let valid_scope_name = captures
                 .get(1)
                 .map(|scope| scope.as_str())
-                .map(|scope| utf8_percent_encode(scope, ENCODE_URI_SET).to_string() == scope)
-                .unwrap_or(true);
+                .is_none_or(|scope| utf8_percent_encode(scope, ENCODE_URI_SET).to_string() == scope);
 
             let valid_package_name = captures
                 .get(2)
                 .map(|package| package.as_str())
-                .map(|package| utf8_percent_encode(package, ENCODE_URI_SET).to_string() == package)
-                .unwrap_or(true);
+                .is_none_or(|package| utf8_percent_encode(package, ENCODE_URI_SET).to_string() == package);
 
             if valid_scope_name && valid_package_name {
                 return done(warnings, errors);

@@ -14,7 +14,7 @@ thread_local!(static TASK_ID: usize = NEXT_ID.fetch_add(1, Ordering::SeqCst));
 // initializes the root and home directories for the current task
 fn init() {
     static GLOBAL_INIT: Once = Once::new();
-    thread_local!(static LOCAL_INIT: Cell<bool> = Cell::new(false));
+    thread_local!(static LOCAL_INIT: Cell<bool> = const { Cell::new(false) });
     GLOBAL_INIT.call_once(|| {
         global_root().mkdir_p();
     });
@@ -25,7 +25,7 @@ fn init() {
         i.set(true);
         root().rm_rf();
         home().mkdir_p();
-    })
+    });
 }
 
 // the root directory for the smoke tests, in `target/smoke_test`
@@ -46,11 +46,13 @@ fn global_root() -> PathBuf {
     path.join(SMOKE_TEST_DIR)
 }
 
+#[must_use]
 pub fn root() -> PathBuf {
     init();
-    global_root().join(TASK_ID.with(|my_id| format!("t{}", my_id)))
+    global_root().join(TASK_ID.with(|my_id| format!("t{my_id}")))
 }
 
+#[must_use]
 pub fn home() -> PathBuf {
     root().join("home")
 }
@@ -60,10 +62,10 @@ enum Remove {
     Dir,
 }
 impl Remove {
-    fn to_str(&self) -> &'static str {
+    const fn to_str(&self) -> &'static str {
         match *self {
-            Remove::File => "remove file",
-            Remove::Dir => "remove dir",
+            Self::File => "remove file",
+            Self::Dir => "remove dir",
         }
     }
 
@@ -76,12 +78,12 @@ impl Remove {
             ok_or_panic! { fs::set_permissions(path, p) };
         }
         match *self {
-            Remove::File => fs::remove_file(path),
-            Remove::Dir => fs::remove_dir_all(path), // ensure all dir contents are removed
+            Self::File => fs::remove_file(path),
+            Self::Dir => fs::remove_dir_all(path), // ensure all dir contents are removed
         }
         .unwrap_or_else(|e| {
             panic!("failed to {} {}: {}", self.to_str(), path.display(), e);
-        })
+        });
     }
 }
 
@@ -137,6 +139,6 @@ impl PathExt for Path {
     // create all paths up to the input path
     fn mkdir_p(&self) {
         fs::create_dir_all(self)
-            .unwrap_or_else(|e| panic!("failed to mkdir_p {}: {}", self.display(), e))
+            .unwrap_or_else(|e| panic!("failed to mkdir_p {}: {}", self.display(), e));
     }
 }

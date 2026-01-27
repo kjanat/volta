@@ -19,6 +19,7 @@ pub enum PackageManager {
 impl PackageManager {
     /// Given the `package_root`, returns the directory where the source is stored for this
     /// package manager. This will include the top-level `node_modules`, where appropriate.
+    #[must_use] 
     pub fn source_dir(self, package_root: PathBuf) -> PathBuf {
         let mut path = self.source_root(package_root);
         path.push("node_modules");
@@ -29,16 +30,17 @@ impl PackageManager {
     /// Given the `package_root`, returns the root of the source directory. This directory will
     /// contain the top-level `node-modules`
     #[cfg(unix)]
+    #[must_use] 
     pub fn source_root(self, package_root: PathBuf) -> PathBuf {
         let mut path = package_root;
         match self {
             // On Unix, the source is always within a `lib` subdirectory, with both npm and Yarn
-            PackageManager::Npm | PackageManager::Yarn => path.push("lib"),
+            Self::Npm | Self::Yarn => path.push("lib"),
             // pnpm puts the source node_modules directory in the global-dir
             // plus a versioned subdirectory.
             // FIXME: Here the subdirectory is hard-coded, I don't know if it's
             // possible to retrieve it from pnpm dynamically.
-            PackageManager::Pnpm => path.push("5"),
+            Self::Pnpm => path.push("5"),
         }
 
         path
@@ -72,6 +74,7 @@ impl PackageManager {
     /// Given the `package_root`, returns the directory where binaries are stored for this package
     /// manager.
     #[cfg(unix)]
+    #[must_use] 
     pub fn binary_dir(self, package_root: PathBuf) -> PathBuf {
         // On Unix, the binaries are always within a `bin` subdirectory for both npm and Yarn
         let mut path = package_root;
@@ -101,9 +104,9 @@ impl PackageManager {
     pub fn setup_global_command(self, command: &mut Command, package_root: PathBuf) {
         command.env("npm_config_prefix", &package_root);
 
-        if let PackageManager::Yarn = self {
+        if self == Self::Yarn {
             command.env("npm_config_global_folder", self.source_root(package_root));
-        } else if let PackageManager::Pnpm = self {
+        } else if self == Self::Pnpm {
             // FIXME: Find out if there is a perfect way to intercept pnpm global
             // installs by using environment variables or whatever.
             // Using `--global-dir` and `--global-bin-dir` flags here is not enough,
@@ -126,8 +129,8 @@ impl PackageManager {
             // See: https://github.com/volta-cli/rfcs/pull/46#discussion_r861943740
             let mut new_path = global_bin_dir;
             for (name, value) in command.get_envs() {
-                if name == "PATH" {
-                    if let Some(old_path) = value {
+                if name == "PATH"
+                    && let Some(old_path) = value {
                         #[cfg(unix)]
                         let path_delimiter = OsStr::new(":");
                         #[cfg(windows)]
@@ -136,7 +139,6 @@ impl PackageManager {
                             PathBuf::from([new_path.as_os_str(), old_path].join(path_delimiter));
                         break;
                     }
-                }
             }
             command.env("PATH", new_path);
         }
@@ -147,9 +149,9 @@ impl PackageManager {
     /// If there are none or more than one package installed, then we return None
     pub(super) fn get_installed_package(self, package_root: PathBuf) -> Option<String> {
         match self {
-            PackageManager::Npm => get_npm_package_name(self.source_dir(package_root)),
-            PackageManager::Pnpm | PackageManager::Yarn => {
-                get_pnpm_or_yarn_package_name(self.source_root(package_root))
+            Self::Npm => get_npm_package_name(self.source_dir(package_root)),
+            Self::Pnpm | Self::Yarn => {
+                get_pnpm_or_yarn_package_name(&self.source_root(package_root))
             }
         }
     }
@@ -167,7 +169,7 @@ fn get_npm_package_name(mut source_dir: PathBuf) -> Option<String> {
     if possible_name.starts_with('@') {
         source_dir.push(&possible_name);
         let package = get_single_directory_name(&source_dir)?;
-        Some(format!("{}/{}", possible_name, package))
+        Some(format!("{possible_name}/{package}"))
     } else {
         Some(possible_name)
     }
@@ -183,10 +185,10 @@ fn get_single_directory_name(parent_dir: &Path) -> Option<String> {
             // If the entry is a symlink, _both_ is_dir() _and_ is_file() will be false. We want to
             // include symlinks as well as directories in our search, since `npm link` uses
             // symlinks internally, so we only exclude files from this search
-            if !metadata.is_file() {
-                Some(entry)
-            } else {
+            if metadata.is_file() {
                 None
+            } else {
+                Some(entry)
             }
         });
 
@@ -199,7 +201,7 @@ fn get_single_directory_name(parent_dir: &Path) -> Option<String> {
 /// Determine the package name for a pnpm or Yarn global install
 ///
 /// pnpm/Yarn creates a `package.json` file with the globally installed package as a dependency
-fn get_pnpm_or_yarn_package_name(source_root: PathBuf) -> Option<String> {
+fn get_pnpm_or_yarn_package_name(source_root: &Path) -> Option<String> {
     let package_file = source_root.join("package.json");
     let file = File::open(package_file).ok()?;
     let manifest: GlobalYarnManifest = serde_json::de::from_reader(file).ok()?;

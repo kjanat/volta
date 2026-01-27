@@ -36,22 +36,22 @@ impl RawResolveHook {
         B: FnOnce(String) -> H,
     {
         match self {
-            RawResolveHook {
+            Self {
                 prefix: Some(prefix),
                 template: None,
                 bin: None,
             } => Ok(to_prefix(prefix)),
-            RawResolveHook {
+            Self {
                 prefix: None,
                 template: Some(template),
                 bin: None,
             } => Ok(to_template(template)),
-            RawResolveHook {
+            Self {
                 prefix: None,
                 template: None,
                 bin: Some(bin),
             } => Ok(to_bin(bin)),
-            RawResolveHook {
+            Self {
                 prefix: None,
                 template: None,
                 bin: None,
@@ -105,16 +105,16 @@ impl RawIndexHook {
 impl TryFrom<RawPublishHook> for super::Publish {
     type Error = VoltaError;
 
-    fn try_from(raw: RawPublishHook) -> Fallible<super::Publish> {
+    fn try_from(raw: RawPublishHook) -> Fallible<Self> {
         match raw {
             RawPublishHook {
                 url: Some(url),
                 bin: None,
-            } => Ok(super::Publish::Url(url)),
+            } => Ok(Self::Url(url)),
             RawPublishHook {
                 url: None,
                 bin: Some(bin),
-            } => Ok(super::Publish::Bin(bin)),
+            } => Ok(Self::Bin(bin)),
             RawPublishHook {
                 url: None,
                 bin: None,
@@ -142,10 +142,10 @@ pub struct RawEventHooks {
 impl TryFrom<RawEventHooks> for super::EventHooks {
     type Error = VoltaError;
 
-    fn try_from(raw: RawEventHooks) -> Fallible<super::EventHooks> {
-        let publish = raw.publish.map(|p| p.try_into()).transpose()?;
+    fn try_from(raw: RawEventHooks) -> Fallible<Self> {
+        let publish = raw.publish.map(std::convert::TryInto::try_into).transpose()?;
 
-        Ok(super::EventHooks { publish })
+        Ok(Self { publish })
     }
 }
 
@@ -174,7 +174,7 @@ impl RawHookConfig {
         let npm = self.npm.map(|n| n.into_tool_hooks(base_dir)).transpose()?;
         let pnpm = self.pnpm.map(|p| p.into_tool_hooks(base_dir)).transpose()?;
         let yarn = self.yarn.map(|y| y.into_yarn_hooks(base_dir)).transpose()?;
-        let events = self.events.map(|e| e.try_into()).transpose()?;
+        let events = self.events.map(std::convert::TryInto::try_into).transpose()?;
         Ok(super::HookConfig {
             node,
             npm,

@@ -15,23 +15,21 @@ pub fn send_events(command: &str, events: &[Event]) {
     match serde_json::to_string_pretty(&events) {
         Ok(events_json) => {
             let tempfile_path = env::var_os("VOLTA_WRITE_EVENTS_FILE")
-                .and_then(|_| write_events_file(events_json.clone()));
-            if let Some(ref mut child_process) = spawn_process(command, tempfile_path) {
-                if let Some(ref mut p_stdin) = child_process.stdin.as_mut() {
-                    if let Err(error) = writeln!(p_stdin, "{}", events_json) {
-                        debug!("Could not write events to executable stdin: {:?}", error);
+                .and_then(|_| write_events_file(&events_json));
+            if let Some(child_process) = &mut spawn_process(command, tempfile_path)
+                && let Some(p_stdin) = child_process.stdin.as_mut()
+                    && let Err(error) = writeln!(p_stdin, "{events_json}") {
+                        debug!("Could not write events to executable stdin: {error:?}");
                     }
-                }
-            }
         }
         Err(error) => {
-            debug!("Could not serialize events data to JSON: {:?}", error);
+            debug!("Could not serialize events data to JSON: {error:?}");
         }
     }
 }
 
 // Write the events JSON to a file in the temporary directory
-fn write_events_file(events_json: String) -> Option<PathBuf> {
+fn write_events_file(events_json: &str) -> Option<PathBuf> {
     match NamedTempFile::new() {
         Ok(mut events_file) => {
             match events_file.write_all(events_json.as_bytes()) {
@@ -42,19 +40,19 @@ fn write_events_file(events_json: String) -> Option<PathBuf> {
                     match path.keep() {
                         Ok(tempfile_path) => Some(tempfile_path),
                         Err(error) => {
-                            debug!("Failed to persist temp file for events data: {:?}", error);
+                            debug!("Failed to persist temp file for events data: {error:?}");
                             None
                         }
                     }
                 }
                 Err(error) => {
-                    debug!("Failed to write events to the temp file: {:?}", error);
+                    debug!("Failed to write events to the temp file: {error:?}");
                     None
                 }
             }
         }
         Err(error) => {
-            debug!("Failed to create a temp file for events data: {:?}", error);
+            debug!("Failed to create a temp file for events data: {error:?}");
             None
         }
     }
@@ -76,7 +74,7 @@ fn spawn_process(command: &str, tempfile_path: Option<PathBuf>) -> Option<Child>
 
         match child.spawn() {
             Err(err) => {
-                debug!("Unable to run executable command: '{}'\n{}", command, err);
+                debug!("Unable to run executable command: '{command}'\n{err}");
                 None
             }
             Ok(c) => Some(c),

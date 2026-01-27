@@ -7,7 +7,7 @@ use super::NODE_DISTRO_IDENTIFIER;
 ))]
 use super::NODE_DISTRO_IDENTIFIER_FALLBACK;
 use crate::version::{option_version_serde, version_serde};
-use node_semver::Version;
+use nodejs_semver::Version;
 use serde::{Deserialize, Deserializer};
 
 /// The index of the public Node server.
@@ -37,7 +37,7 @@ pub struct RawNodeEntry {
 }
 
 impl From<RawNodeIndex> for NodeIndex {
-    fn from(raw: RawNodeIndex) -> NodeIndex {
+    fn from(raw: RawNodeIndex) -> Self {
         let entries = raw
             .0
             .into_iter()
@@ -73,7 +73,7 @@ impl From<RawNodeIndex> for NodeIndex {
             })
             .collect();
 
-        NodeIndex { entries }
+        Self { entries }
     }
 }
 

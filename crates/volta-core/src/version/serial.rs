@@ -1,4 +1,4 @@
-use node_semver::{Range, SemverError};
+use nodejs_semver::{Range, SemverError};
 
 // NOTE: using `parse_compat` here because the semver crate defaults to
 // parsing in a cargo-compatible way. This is normally fine, except for
@@ -21,7 +21,7 @@ pub fn parse_requirements(src: &str) -> Result<Range, SemverError> {
 pub mod tests {
 
     use crate::version::serial::parse_requirements;
-    use node_semver::Range;
+    use nodejs_semver::Range;
 
     #[test]
     fn test_parse_requirements() {

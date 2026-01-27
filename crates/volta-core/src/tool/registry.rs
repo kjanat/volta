@@ -9,7 +9,7 @@ use crate::version::{hashmap_version_serde, version_serde};
 use attohttpc::header::ACCEPT;
 use attohttpc::Response;
 use cfg_if::cfg_if;
-use node_semver::Version;
+use nodejs_semver::Version;
 use serde::Deserialize;
 
 // Accept header needed to request the abbreviated metadata from the npm registry
@@ -29,14 +29,14 @@ cfg_if! {
         }
     } else {
         pub fn public_registry_index(package: &str) -> String {
-            format!("https://registry.npmjs.org/{}", package)
+            format!("https://registry.npmjs.org/{package}")
         }
     }
 }
 
 // fetch a registry that returns info in Npm format
 pub fn fetch_npm_registry(url: String, name: &str) -> Fallible<(String, PackageIndex)> {
-    let spinner = progress_spinner(format!("Fetching npm registry: {}", url));
+    let spinner = progress_spinner(format!("Fetching npm registry: {url}"));
     let metadata: RawPackageMetadata = attohttpc::get(&url)
         .header(ACCEPT, NPM_ABBREVIATED_ACCEPT_HEADER)
         .send()
@@ -78,11 +78,10 @@ pub fn find_unpack_dir(in_dir: &Path) -> Fallible<PathBuf> {
         .collect();
 
     // if there is only one directory, return that
-    if let [(entry, metadata)] = dirs.as_slice() {
-        if metadata.is_dir() {
+    if let [(entry, metadata)] = dirs.as_slice()
+        && metadata.is_dir() {
             return Ok(entry.path());
         }
-    }
     // there is more than just a single directory here, something is wrong
     Err(ErrorKind::PackageUnpackError.into())
 }
@@ -102,9 +101,10 @@ pub struct PackageIndex {
 /// Package Metadata Response
 ///
 /// See npm registry API doc:
-/// https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md
+/// <https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md>
 #[derive(Deserialize, Debug)]
 pub struct RawPackageMetadata {
+    #[allow(dead_code)]
     pub name: String,
     pub versions: HashMap<String, RawPackageVersionInfo>,
     #[serde(
@@ -119,17 +119,19 @@ pub struct RawPackageVersionInfo {
     // there's a lot more in there, but right now just care about the version
     #[serde(with = "version_serde")]
     pub version: Version,
+    #[allow(dead_code)]
     pub dist: RawDistInfo,
 }
 
 #[derive(Deserialize, Clone, Debug)]
+#[allow(dead_code)]
 pub struct RawDistInfo {
     pub shasum: String,
     pub tarball: String,
 }
 
 impl From<RawPackageMetadata> for PackageIndex {
-    fn from(serial: RawPackageMetadata) -> PackageIndex {
+    fn from(serial: RawPackageMetadata) -> Self {
         let mut entries: Vec<PackageDetails> = serial
             .versions
             .into_values()
@@ -140,7 +142,7 @@ impl From<RawPackageMetadata> for PackageIndex {
 
         entries.sort_by(|a, b| b.version.cmp(&a.version));
 
-        PackageIndex {
+        Self {
             tags: serial.dist_tags,
             entries,
         }

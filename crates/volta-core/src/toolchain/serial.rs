@@ -1,7 +1,7 @@
 use crate::error::{Context, ErrorKind, Fallible, VoltaError};
 use crate::platform::PlatformSpec;
 use crate::version::{option_version_serde, version_serde};
-use node_semver::Version;
+use nodejs_semver::Version;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -25,8 +25,9 @@ pub struct Platform {
 }
 
 impl Platform {
+    #[must_use]
     pub fn of(source: &PlatformSpec) -> Self {
-        Platform {
+        Self {
             node: Some(NodeVersion {
                 runtime: source.node.clone(),
                 npm: source.npm.clone(),
@@ -37,6 +38,10 @@ impl Platform {
     }
 
     /// Serialize the Platform to a JSON String
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails.
     pub fn into_json(self) -> Fallible<String> {
         serde_json::to_string_pretty(&self).with_context(|| ErrorKind::StringifyPlatformError)
     }
@@ -56,7 +61,7 @@ impl TryFrom<String> for Platform {
 }
 
 impl From<Platform> for Option<PlatformSpec> {
-    fn from(platform: Platform) -> Option<PlatformSpec> {
+    fn from(platform: Platform) -> Self {
         let yarn = platform.yarn;
         let pnpm = platform.pnpm;
         platform.node.map(|node_version| PlatformSpec {
@@ -73,7 +78,7 @@ pub mod tests {
 
     use super::*;
     use crate::platform;
-    use node_semver::Version;
+    use nodejs_semver::Version;
 
     // NOTE: serde_json is required with the "preserve_order" feature in Cargo.toml,
     // so these tests will serialized/deserialize in a predictable order

@@ -16,6 +16,10 @@ use log::{info, warn};
 /// - The JSON configuration files for both the package and its bins
 /// - The shims for the package bins
 /// - The package directory itself
+///
+/// # Errors
+///
+/// Returns an error if the package cannot be uninstalled.
 pub fn uninstall(name: &str) -> Fallible<()> {
     let home = volta_home()?;
     // Acquire a lock on the Volta directory, if possible, to prevent concurrent changes
@@ -28,13 +32,13 @@ pub fn uninstall(name: &str) -> Fallible<()> {
         None => {
             // there is no package config - check for orphaned binaries
             let package_binary_list = binaries_from_package(name)?;
-            if !package_binary_list.is_empty() {
+            if package_binary_list.is_empty() {
+                false
+            } else {
                 for bin_name in package_binary_list {
                     remove_config_and_shim(&bin_name, name)?;
                 }
                 true
-            } else {
-                false
             }
         }
         Some(package_config) => {
@@ -56,7 +60,7 @@ pub fn uninstall(name: &str) -> Fallible<()> {
     if package_found {
         info!("{} package '{}' uninstalled", success_prefix(), name);
     } else {
-        warn!("No package '{}' found to uninstall", name);
+        warn!("No package '{name}' found to uninstall");
     }
 
     Ok(())
@@ -68,8 +72,7 @@ fn remove_config_and_shim(bin_name: &str, pkg_name: &str) -> Fallible<()> {
     let config_file = volta_home()?.default_tool_bin_config(bin_name);
     remove_file_if_exists(config_file)?;
     info!(
-        "Removed executable '{}' installed by '{}'",
-        bin_name, pkg_name
+        "Removed executable '{bin_name}' installed by '{pkg_name}'"
     );
     Ok(())
 }
@@ -81,11 +84,10 @@ fn binaries_from_package(package: &str) -> Fallible<Vec<String>> {
 
     dir_entry_match(bin_config_dir, |entry| {
         let path = entry.path();
-        if let Ok(config) = BinConfig::from_file(path) {
-            if config.package == package {
+        if let Ok(config) = BinConfig::from_file(path)
+            && config.package == package {
                 return Some(config.name);
             }
-        }
         None
     })
     .or_else(ok_if_not_found)
@@ -106,11 +108,10 @@ fn remove_shared_link_dir(name: &str) -> Fallible<()> {
     if name.starts_with('@') {
         shared_lib_dir.pop();
 
-        if let Ok(mut entries) = read_dir_eager(&shared_lib_dir) {
-            if entries.next().is_none() {
+        if let Ok(mut entries) = read_dir_eager(&shared_lib_dir)
+            && entries.next().is_none() {
                 remove_dir_if_exists(&shared_lib_dir)?;
             }
-        }
     }
 
     Ok(())

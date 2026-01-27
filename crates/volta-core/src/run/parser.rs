@@ -26,13 +26,13 @@ const NPM_LINK_ALIASES: [&str; 2] = ["link", "ln"];
 /// Aliases that npm supports for the `update` command
 const NPM_UPDATE_ALIASES: [&str; 4] = ["update", "udpate", "upgrade", "up"];
 /// Aliases that pnpm supports for the 'remove' command,
-/// see: https://pnpm.io/cli/remove
+/// see: <https://pnpm.io/cli/remove>
 const PNPM_UNINSTALL_ALIASES: [&str; 4] = ["remove", "uninstall", "rm", "un"];
 /// Aliases that pnpm supports for the 'update' command,
-/// see: https://pnpm.io/cli/update
+/// see: <https://pnpm.io/cli/update>
 const PNPM_UPDATE_ALIASES: [&str; 3] = ["update", "upgrade", "up"];
 /// Aliases that pnpm supports for the 'link' command
-/// see: https://pnpm.io/cli/link
+/// see: <https://pnpm.io/cli/link>
 const PNPM_LINK_ALIASES: [&str; 2] = ["link", "ln"];
 
 pub enum CommandArg<'a> {
@@ -137,7 +137,7 @@ impl<'a> CommandArg<'a> {
 
     /// Parse the given set of arguments to see if they correspond to an intercepted pnpm command
     #[allow(dead_code)]
-    pub fn for_pnpm<S>(args: &'a [S]) -> CommandArg<'a>
+    pub fn for_pnpm<S>(args: &'a [S]) -> Self
     where
         S: AsRef<OsStr>,
     {
@@ -161,9 +161,8 @@ impl<'a> CommandArg<'a> {
                 // pnpm subcommands that support the `global` flag:
                 // `add`, `update`, `remove`, `link`, `list`, `outdated`,
                 // `why`, `env`, `root`, `bin`.
-                match is_global && !prefixed {
-                    false => CommandArg::Standard,
-                    true => match subcommand.to_str() {
+                if is_global && !prefixed {
+                    match subcommand.to_str() {
                         // `add`
                         Some("add") => {
                             let manager = PackageManager::Pnpm;
@@ -177,7 +176,7 @@ impl<'a> CommandArg<'a> {
                             }))
                         }
                         // `update`
-                        Some(cmd) if PNPM_UPDATE_ALIASES.iter().any(|&a| a == cmd) => {
+                        Some(cmd) if PNPM_UPDATE_ALIASES.contains(&cmd) => {
                             let manager = PackageManager::Pnpm;
                             let mut common_args = vec![subcommand];
                             common_args.extend(flags);
@@ -188,13 +187,13 @@ impl<'a> CommandArg<'a> {
                             }))
                         }
                         // `remove`
-                        Some(cmd) if PNPM_UNINSTALL_ALIASES.iter().any(|&a| a == cmd) => {
+                        Some(cmd) if PNPM_UNINSTALL_ALIASES.contains(&cmd) => {
                             CommandArg::Global(GlobalCommand::Uninstall(UninstallArgs {
                                 tools: tools.to_vec(),
                             }))
                         }
                         // `link`
-                        Some(cmd) if PNPM_LINK_ALIASES.iter().any(|&a| a == cmd) => {
+                        Some(cmd) if PNPM_LINK_ALIASES.contains(&cmd) => {
                             let mut common_args = vec![subcommand];
                             common_args.extend(flags);
                             CommandArg::Intercepted(InterceptedCommand::Link(LinkArgs {
@@ -203,7 +202,9 @@ impl<'a> CommandArg<'a> {
                             }))
                         }
                         _ => CommandArg::Standard,
-                    },
+                    }
+                } else {
+                    CommandArg::Standard
                 }
             }
         }
@@ -475,7 +476,7 @@ where
 {
     let (has_global, has_prefix) = args.iter().fold((false, false), |(global, prefix), arg| {
         match arg.as_ref().to_str() {
-            Some("-g") | Some("--global") => (true, prefix),
+            Some("-g" | "--global") => (true, prefix),
             Some(pre) if pre.starts_with("--prefix") => (global, true),
             _ => (global, prefix),
         }
@@ -492,10 +493,7 @@ fn is_flag<A>(arg: &A) -> bool
 where
     A: AsRef<OsStr>,
 {
-    match arg.as_ref().to_str() {
-        Some(a) => a.starts_with('-'),
-        None => false,
-    }
+    arg.as_ref().to_str().is_some_and(|a| a.starts_with('-'))
 }
 
 fn is_positional<A>(arg: &A) -> bool

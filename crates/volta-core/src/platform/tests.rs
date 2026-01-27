@@ -2,17 +2,12 @@ use super::*;
 use crate::layout::volta_home;
 #[cfg(windows)]
 use crate::layout::volta_install;
-use node_semver::Version;
+use nodejs_semver::Version;
 #[cfg(windows)]
 use std::path::PathBuf;
 
-// Since unit tests are run in parallel, tests that modify the PATH environment variable are subject to race conditions
-// To prevent that, ensure that all tests that rely on PATH are run in serial by adding them to this meta-test
-#[test]
-fn test_paths() {
-    test_image_path();
-    test_system_path();
-}
+// Tests for path computation use test-specific methods to avoid mutating the process environment
+// (env::set_var is unsafe in Rust 2024)
 
 #[cfg(unix)]
 fn build_test_path() -> String {
@@ -36,13 +31,13 @@ fn build_test_path() -> String {
         .expect("Could not create path containing shim dir")
 }
 
+#[test]
 fn test_image_path() {
     #[cfg(unix)]
     let path_delimiter = ":";
     #[cfg(windows)]
     let path_delimiter = ";";
     let path = build_test_path();
-    std::env::set_var("PATH", &path);
 
     let node_bin = volta_home().unwrap().node_image_bin_dir("1.2.3");
     let expected_node_bin = node_bin.to_str().unwrap();
@@ -69,7 +64,7 @@ fn test_image_path() {
     };
 
     assert_eq!(
-        only_node.path().unwrap().into_string().unwrap(),
+        only_node.path_from(&path).unwrap().into_string().unwrap(),
         [expected_node_bin, &path].join(path_delimiter)
     );
 
@@ -81,7 +76,7 @@ fn test_image_path() {
     };
 
     assert_eq!(
-        node_npm.path().unwrap().into_string().unwrap(),
+        node_npm.path_from(&path).unwrap().into_string().unwrap(),
         [expected_npm_bin, expected_node_bin, &path].join(path_delimiter)
     );
 
@@ -93,7 +88,7 @@ fn test_image_path() {
     };
 
     assert_eq!(
-        node_pnpm.path().unwrap().into_string().unwrap(),
+        node_pnpm.path_from(&path).unwrap().into_string().unwrap(),
         [expected_pnpm_bin, expected_node_bin, &path].join(path_delimiter)
     );
 
@@ -105,7 +100,7 @@ fn test_image_path() {
     };
 
     assert_eq!(
-        node_yarn.path().unwrap().into_string().unwrap(),
+        node_yarn.path_from(&path).unwrap().into_string().unwrap(),
         [expected_yarn_bin, expected_node_bin, &path].join(path_delimiter)
     );
 
@@ -117,7 +112,11 @@ fn test_image_path() {
     };
 
     assert_eq!(
-        node_npm_pnpm.path().unwrap().into_string().unwrap(),
+        node_npm_pnpm
+            .path_from(&path)
+            .unwrap()
+            .into_string()
+            .unwrap(),
         [
             expected_npm_bin,
             expected_pnpm_bin,
@@ -135,7 +134,11 @@ fn test_image_path() {
     };
 
     assert_eq!(
-        node_npm_yarn.path().unwrap().into_string().unwrap(),
+        node_npm_yarn
+            .path_from(&path)
+            .unwrap()
+            .into_string()
+            .unwrap(),
         [
             expected_npm_bin,
             expected_yarn_bin,
@@ -146,9 +149,9 @@ fn test_image_path() {
     );
 }
 
+#[test]
 fn test_system_path() {
     let path = build_test_path();
-    std::env::set_var("PATH", path);
 
     #[cfg(unix)]
     let expected_path = String::from("/usr/bin:/bin");
@@ -156,7 +159,7 @@ fn test_system_path() {
     let expected_path = String::from("C:\\\\somebin;D:\\\\ProbramFlies");
 
     assert_eq!(
-        System::path().unwrap().into_string().unwrap(),
+        System::path_from(&path).unwrap().into_string().unwrap(),
         expected_path
     );
 }
@@ -214,7 +217,7 @@ mod inherit_option {
 }
 
 mod cli_platform {
-    use node_semver::Version;
+    use nodejs_semver::Version;
 
     const NODE_VERSION: Version = Version {
         major: 12,
@@ -244,7 +247,7 @@ mod cli_platform {
 
         #[test]
         fn uses_node() {
-            let test = CliPlatform {
+            let test = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -266,7 +269,7 @@ mod cli_platform {
 
         #[test]
         fn inherits_node() {
-            let test = CliPlatform {
+            let test = Overrides {
                 node: None,
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -288,7 +291,7 @@ mod cli_platform {
 
         #[test]
         fn uses_npm() {
-            let test = CliPlatform {
+            let test = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::Some(NPM_VERSION),
                 pnpm: InheritOption::default(),
@@ -311,7 +314,7 @@ mod cli_platform {
 
         #[test]
         fn inherits_npm() {
-            let test = CliPlatform {
+            let test = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::Inherit,
                 pnpm: InheritOption::default(),
@@ -334,7 +337,7 @@ mod cli_platform {
 
         #[test]
         fn none_does_not_inherit_npm() {
-            let test = CliPlatform {
+            let test = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::None,
                 pnpm: InheritOption::default(),
@@ -355,7 +358,7 @@ mod cli_platform {
 
         #[test]
         fn uses_yarn() {
-            let test = CliPlatform {
+            let test = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -378,7 +381,7 @@ mod cli_platform {
 
         #[test]
         fn inherits_yarn() {
-            let test = CliPlatform {
+            let test = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -401,7 +404,7 @@ mod cli_platform {
 
         #[test]
         fn none_does_not_inherit_yarn() {
-            let test = CliPlatform {
+            let test = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -427,7 +430,7 @@ mod cli_platform {
 
         #[test]
         fn none_if_no_node() {
-            let cli = CliPlatform {
+            let cli = Overrides {
                 node: None,
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -441,7 +444,7 @@ mod cli_platform {
 
         #[test]
         fn uses_cli_node() {
-            let cli = CliPlatform {
+            let cli = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -457,7 +460,7 @@ mod cli_platform {
 
         #[test]
         fn uses_cli_npm() {
-            let cli = CliPlatform {
+            let cli = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::Some(NPM_VERSION),
                 pnpm: InheritOption::default(),
@@ -473,7 +476,7 @@ mod cli_platform {
 
         #[test]
         fn no_npm() {
-            let cli = CliPlatform {
+            let cli = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::None,
                 pnpm: InheritOption::default(),
@@ -487,7 +490,7 @@ mod cli_platform {
 
         #[test]
         fn inherit_npm_becomes_none() {
-            let cli = CliPlatform {
+            let cli = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::Inherit,
                 pnpm: InheritOption::default(),
@@ -501,7 +504,7 @@ mod cli_platform {
 
         #[test]
         fn uses_cli_yarn() {
-            let cli = CliPlatform {
+            let cli = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -517,7 +520,7 @@ mod cli_platform {
 
         #[test]
         fn no_yarn() {
-            let cli = CliPlatform {
+            let cli = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),
@@ -531,7 +534,7 @@ mod cli_platform {
 
         #[test]
         fn inherit_yarn_becomes_none() {
-            let cli = CliPlatform {
+            let cli = Overrides {
                 node: Some(NODE_VERSION),
                 npm: InheritOption::default(),
                 pnpm: InheritOption::default(),

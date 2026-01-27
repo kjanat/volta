@@ -9,12 +9,16 @@ use crate::error::{Context, ErrorKind, Fallible};
 use crate::fs::read_dir_eager;
 use crate::layout::volta_home;
 use crate::tool::PackageConfig;
-use crate::version::parse_version;
+use crate::version::parse;
 use log::debug;
-use node_semver::Version;
+use nodejs_semver::Version;
 use walkdir::WalkDir;
 
 /// Checks if a given Node version image is available on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the Volta home directory cannot be determined.
 pub fn node_available(version: &Version) -> Fallible<bool> {
     volta_home().map(|home| {
         home.node_image_root_dir()
@@ -24,41 +28,73 @@ pub fn node_available(version: &Version) -> Fallible<bool> {
 }
 
 /// Collects a set of all Node versions fetched on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the inventory directory cannot be read.
 pub fn node_versions() -> Fallible<BTreeSet<Version>> {
     volta_home().and_then(|home| read_versions(home.node_image_root_dir()))
 }
 
 /// Checks if a given npm version image is available on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the Volta home directory cannot be determined.
 pub fn npm_available(version: &Version) -> Fallible<bool> {
     volta_home().map(|home| home.npm_image_dir(&version.to_string()).exists())
 }
 
 /// Collects a set of all npm versions fetched on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the inventory directory cannot be read.
 pub fn npm_versions() -> Fallible<BTreeSet<Version>> {
     volta_home().and_then(|home| read_versions(home.npm_image_root_dir()))
 }
 
 /// Checks if a given pnpm version image is available on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the Volta home directory cannot be determined.
 pub fn pnpm_available(version: &Version) -> Fallible<bool> {
     volta_home().map(|home| home.pnpm_image_dir(&version.to_string()).exists())
 }
 
 /// Collects a set of all pnpm versions fetched on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the inventory directory cannot be read.
 pub fn pnpm_versions() -> Fallible<BTreeSet<Version>> {
     volta_home().and_then(|home| read_versions(home.pnpm_image_root_dir()))
 }
 
 /// Checks if a given Yarn version image is available on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the Volta home directory cannot be determined.
 pub fn yarn_available(version: &Version) -> Fallible<bool> {
     volta_home().map(|home| home.yarn_image_dir(&version.to_string()).exists())
 }
 
 /// Collects a set of all Yarn versions fetched on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the inventory directory cannot be read.
 pub fn yarn_versions() -> Fallible<BTreeSet<Version>> {
     volta_home().and_then(|home| read_versions(home.yarn_image_root_dir()))
 }
 
 /// Collects a set of all Package Configs on the local machine
+///
+/// # Errors
+///
+/// Returns an error if the package directory cannot be read.
 pub fn package_configs() -> Fallible<BTreeSet<PackageConfig>> {
     let package_dir = volta_home()?.default_package_dir();
 
@@ -83,7 +119,7 @@ pub fn package_configs() -> Fallible<BTreeSet<PackageConfig>> {
                 }
             }
             Err(e) => {
-                debug!("{}", e);
+                debug!("{e}");
                 None
             }
         })
@@ -100,6 +136,6 @@ fn read_versions(dir: &Path) -> Fallible<BTreeSet<Version>> {
 
     Ok(contents
         .filter(|(_, metadata)| metadata.is_dir())
-        .filter_map(|(entry, _)| parse_version(entry.file_name().to_string_lossy()).ok())
+        .filter_map(|(entry, _)| parse(entry.file_name().to_string_lossy()).ok())
         .collect())
 }

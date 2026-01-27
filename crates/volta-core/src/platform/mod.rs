@@ -5,7 +5,7 @@ use crate::error::{ErrorKind, Fallible};
 use crate::session::Session;
 use crate::tool::{Node, Npm, Pnpm, Yarn};
 use crate::VOLTA_FEATURE_PNPM;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 mod image;
 mod system;
@@ -37,10 +37,10 @@ pub enum Source {
 impl fmt::Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Source::Default => write!(f, "default"),
-            Source::Project => write!(f, "project"),
-            Source::Binary => write!(f, "binary"),
-            Source::CommandLine => write!(f, "command-line"),
+            Self::Default => write!(f, "default"),
+            Self::Project => write!(f, "project"),
+            Self::Binary => write!(f, "binary"),
+            Self::CommandLine => write!(f, "command-line"),
         }
     }
 }
@@ -51,29 +51,29 @@ pub struct Sourced<T> {
 }
 
 impl<T> Sourced<T> {
-    pub fn with_default(value: T) -> Self {
-        Sourced {
+    pub const fn with_default(value: T) -> Self {
+        Self {
             value,
             source: Source::Default,
         }
     }
 
-    pub fn with_project(value: T) -> Self {
-        Sourced {
+    pub const fn with_project(value: T) -> Self {
+        Self {
             value,
             source: Source::Project,
         }
     }
 
-    pub fn with_binary(value: T) -> Self {
-        Sourced {
+    pub const fn with_binary(value: T) -> Self {
+        Self {
             value,
             source: Source::Binary,
         }
     }
 
-    pub fn with_command_line(value: T) -> Self {
-        Sourced {
+    pub const fn with_command_line(value: T) -> Self {
+        Self {
             value,
             source: Source::CommandLine,
         }
@@ -81,7 +81,7 @@ impl<T> Sourced<T> {
 }
 
 impl<T> Sourced<T> {
-    pub fn as_ref(&self) -> Sourced<&T> {
+    pub const fn as_ref(&self) -> Sourced<&T> {
         Sourced {
             value: &self.value,
             source: self.source,
@@ -93,6 +93,7 @@ impl<T> Sourced<&T>
 where
     T: Clone,
 {
+    #[must_use] 
     pub fn cloned(self) -> Sourced<T> {
         Sourced {
             value: self.value.clone(),
@@ -105,8 +106,8 @@ impl<T> Clone for Sourced<T>
 where
     T: Clone,
 {
-    fn clone(&self) -> Sourced<T> {
-        Sourced {
+    fn clone(&self) -> Self {
+        Self {
             value: self.value.clone(),
             source: self.source,
         }
@@ -130,30 +131,31 @@ impl<T> InheritOption<T> {
         F: FnOnce(T) -> U,
     {
         match self {
-            InheritOption::Some(value) => InheritOption::Some(f(value)),
-            InheritOption::None => InheritOption::None,
-            InheritOption::Inherit => InheritOption::Inherit,
+            Self::Some(value) => InheritOption::Some(f(value)),
+            Self::None => InheritOption::None,
+            Self::Inherit => InheritOption::Inherit,
         }
     }
 
     /// Converts the `InheritOption` into a regular `Option` by inheriting from the provided value if needed
     pub fn inherit(self, other: Option<T>) -> Option<T> {
         match self {
-            InheritOption::Some(value) => Some(value),
-            InheritOption::None => None,
-            InheritOption::Inherit => other,
+            Self::Some(value) => Some(value),
+            Self::None => None,
+            Self::Inherit => other,
         }
     }
 }
 
 impl<T> From<InheritOption<T>> for Option<T> {
-    fn from(base: InheritOption<T>) -> Option<T> {
+    fn from(base: InheritOption<T>) -> Self {
         base.inherit(None)
     }
 }
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq)]
 #[cfg_attr(test, derive(Debug))]
+#[allow(clippy::module_name_repetitions)]
 /// Represents the specification of a single Platform, regardless of the source
 pub struct PlatformSpec {
     pub node: Version,
@@ -163,7 +165,7 @@ pub struct PlatformSpec {
 }
 
 impl PlatformSpec {
-    /// Convert this PlatformSpec into a Platform with all sources set to `Default`
+    /// Convert this `PlatformSpec` into a Platform with all sources set to `Default`
     pub fn as_default(&self) -> Platform {
         Platform {
             node: Sourced::with_default(self.node.clone()),
@@ -173,7 +175,7 @@ impl PlatformSpec {
         }
     }
 
-    /// Convert this PlatformSpec into a Platform with all sources set to `Project`
+    /// Convert this `PlatformSpec` into a Platform with all sources set to `Project`
     pub fn as_project(&self) -> Platform {
         Platform {
             node: Sourced::with_project(self.node.clone()),
@@ -183,7 +185,7 @@ impl PlatformSpec {
         }
     }
 
-    /// Convert this PlatformSpec into a Platform with all sources set to `Binary`
+    /// Convert this `PlatformSpec` into a Platform with all sources set to `Binary`
     pub fn as_binary(&self) -> Platform {
         Platform {
             node: Sourced::with_binary(self.node.clone()),
@@ -196,14 +198,14 @@ impl PlatformSpec {
 
 /// Represents a (maybe) platform with values from the command line
 #[derive(Clone)]
-pub struct CliPlatform {
+pub struct Overrides {
     pub node: Option<Version>,
     pub npm: InheritOption<Version>,
     pub pnpm: InheritOption<Version>,
     pub yarn: InheritOption<Version>,
 }
 
-impl CliPlatform {
+impl Overrides {
     /// Merges the `CliPlatform` with a `Platform`, inheriting from the base where needed
     pub fn merge(self, base: Platform) -> Platform {
         Platform {
@@ -215,9 +217,9 @@ impl CliPlatform {
     }
 }
 
-impl From<CliPlatform> for Option<Platform> {
+impl From<Overrides> for Option<Platform> {
     /// Converts the `CliPlatform` into a possible Platform without a base from which to inherit
-    fn from(base: CliPlatform) -> Option<Platform> {
+    fn from(base: Overrides) -> Self {
         match base.node {
             None => None,
             Some(node) => Some(Platform {
@@ -249,6 +251,10 @@ impl Platform {
     ///     pnpm/Yarn from the default platform if available, and merge the two
     ///     platforms into a final one
     /// - If there is no Project platform, then we use the user Default Platform
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the platform cannot be determined.
     pub fn current(session: &mut Session) -> Fallible<Option<Self>> {
         if let Some(mut platform) = session.project_platform()?.map(PlatformSpec::as_project) {
             if platform.pnpm.is_none() {
@@ -274,6 +280,10 @@ impl Platform {
     /// Check out a `Platform` into a fully-realized `Image`
     ///
     /// This will ensure that all necessary tools are fetched and available for execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any tools cannot be fetched.
     pub fn checkout(self, session: &mut Session) -> Fallible<Image> {
         Node::new(self.node.value.clone()).ensure_fetched(session)?;
 
@@ -284,11 +294,10 @@ impl Platform {
         // Only force download of the pnpm version if the pnpm feature flag is set. If it isn't,
         // then we won't be using the `Pnpm` tool to execute (we will be relying on the global
         // package logic), so fetching the Pnpm version would only be redundant work.
-        if env::var_os(VOLTA_FEATURE_PNPM).is_some() {
-            if let Some(Sourced { value: version, .. }) = &self.pnpm {
+        if env::var_os(VOLTA_FEATURE_PNPM).is_some()
+            && let Some(Sourced { value: version, .. }) = &self.pnpm {
                 Pnpm::new(version.clone()).ensure_fetched(session)?;
             }
-        }
 
         if let Some(Sourced { value: version, .. }) = &self.yarn {
             Yarn::new(version.clone()).ensure_fetched(session)?;
@@ -303,6 +312,6 @@ impl Platform {
     }
 }
 
-fn build_path_error() -> ErrorKind {
+const fn build_path_error() -> ErrorKind {
     ErrorKind::BuildPathError
 }

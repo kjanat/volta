@@ -13,6 +13,10 @@ use retry::{retry, OperationResult};
 use tempfile::{tempdir_in, NamedTempFile, TempDir};
 
 /// Opens a file, creating it if it doesn't exist
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be created or opened.
 pub fn touch(path: &Path) -> io::Result<File> {
     if !path.is_file() {
         if let Some(basedir) = path.parent() {
@@ -25,6 +29,10 @@ pub fn touch(path: &Path) -> io::Result<File> {
 
 /// Removes the target directory, if it exists. If the directory doesn't exist, that is treated as
 /// success.
+///
+/// # Errors
+///
+/// Returns an error if the directory exists but cannot be removed.
 pub fn remove_dir_if_exists<P: AsRef<Path>>(path: P) -> Fallible<()> {
     fs::remove_dir_all(&path)
         .or_else(ok_if_not_found)
@@ -34,6 +42,10 @@ pub fn remove_dir_if_exists<P: AsRef<Path>>(path: P) -> Fallible<()> {
 }
 
 /// Removes the target file, if it exists. If the file doesn't exist, that is treated as success.
+///
+/// # Errors
+///
+/// Returns an error if the file exists but cannot be removed.
 pub fn remove_file_if_exists<P: AsRef<Path>>(path: P) -> Fallible<()> {
     fs::remove_file(&path)
         .or_else(ok_if_not_found)
@@ -46,6 +58,10 @@ pub fn remove_file_if_exists<P: AsRef<Path>>(path: P) -> Fallible<()> {
 ///
 /// Handling the error is preferred over checking if a file exists before removing it, since
 /// that avoids a potential race condition between the check and the removal.
+///
+/// # Errors
+///
+/// Returns the original error if it is not `NotFound`.
 pub fn ok_if_not_found<T: Default>(err: io::Error) -> io::Result<T> {
     match err.kind() {
         io::ErrorKind::NotFound => Ok(T::default()),
@@ -54,6 +70,10 @@ pub fn ok_if_not_found<T: Default>(err: io::Error) -> io::Result<T> {
 }
 
 /// Reads a file, if it exists.
+///
+/// # Errors
+///
+/// Returns an error if the file exists but cannot be read.
 pub fn read_file<P: AsRef<Path>>(path: P) -> io::Result<Option<String>> {
     let result: io::Result<String> = fs::read_to_string(path);
 
@@ -76,6 +96,10 @@ pub fn read_file<P: AsRef<Path>>(path: P) -> io::Result<Option<String>> {
 /// Note that this function allocates an intermediate vector of directory entries to
 /// construct the iterator from, so if a directory is expected to be very large, it
 /// will allocate temporary data proportional to the number of entries.
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be read or if any entry's metadata cannot be retrieved.
 pub fn read_dir_eager(dir: &Path) -> io::Result<impl Iterator<Item = (DirEntry, Metadata)>> {
     let entries = read_dir(dir)?;
     let vec = entries
@@ -91,6 +115,10 @@ pub fn read_dir_eager(dir: &Path) -> io::Result<impl Iterator<Item = (DirEntry, 
 
 /// Reads the contents of a directory and returns a Vec of the matched results
 /// from the input function
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be read.
 pub fn dir_entry_match<T, F>(dir: &Path, mut f: F) -> io::Result<Vec<T>>
 where
     F: FnMut(&DirEntry) -> Option<T>,
@@ -102,7 +130,11 @@ where
         .collect::<Vec<T>>())
 }
 
-/// Creates a NamedTempFile in the Volta tmp directory
+/// Creates a `NamedTempFile` in the Volta tmp directory
+///
+/// # Errors
+///
+/// Returns an error if the temp file cannot be created.
 pub fn create_staging_file() -> Fallible<NamedTempFile> {
     let tmp_dir = volta_home()?.tmp_dir();
     NamedTempFile::new_in(tmp_dir).with_context(|| ErrorKind::CreateTempFileError {
@@ -111,6 +143,10 @@ pub fn create_staging_file() -> Fallible<NamedTempFile> {
 }
 
 /// Creates a staging directory in the Volta tmp directory
+///
+/// # Errors
+///
+/// Returns an error if the temp directory cannot be created.
 pub fn create_staging_dir() -> Fallible<TempDir> {
     let tmp_root = volta_home()?.tmp_dir();
     tempdir_in(tmp_root).with_context(|| ErrorKind::CreateTempDirError {
@@ -119,6 +155,10 @@ pub fn create_staging_dir() -> Fallible<TempDir> {
 }
 
 /// Create a file symlink. The `dst` path will be a symbolic link pointing to the `src` path.
+///
+/// # Errors
+///
+/// Returns an error if the symlink cannot be created.
 pub fn symlink_file<S, D>(src: S, dest: D) -> io::Result<()>
 where
     S: AsRef<Path>,
@@ -132,6 +172,10 @@ where
 }
 
 /// Create a directory symlink. The `dst` path will be a symbolic link pointing to the `src` path
+///
+/// # Errors
+///
+/// Returns an error if the symlink cannot be created.
 pub fn symlink_dir<S, D>(src: S, dest: D) -> io::Result<()>
 where
     S: AsRef<Path>,
@@ -145,16 +189,20 @@ where
 }
 
 /// Ensure that a given file has 'executable' permissions, otherwise we won't be able to call it
+///
+/// # Errors
+///
+/// Returns an error if the permissions cannot be read or set.
 #[cfg(unix)]
 pub fn set_executable(bin: &Path) -> io::Result<()> {
     let mut permissions = fs::metadata(bin)?.permissions();
     let mode = permissions.mode();
 
-    if mode & 0o111 != 0o111 {
+    if mode & 0o111 == 0o111 {
+        Ok(())
+    } else {
         permissions.set_mode(mode | 0o111);
         fs::set_permissions(bin, permissions)
-    } else {
-        Ok(())
     }
 }
 
@@ -170,6 +218,10 @@ pub fn set_executable(_bin: &Path) -> io::Result<()> {
 ///
 /// Will retry for ~30 seconds with longer and longer delays between each, to allow for virus scan
 /// and other automated operations to complete.
+///
+/// # Errors
+///
+/// Returns an error if the rename fails after all retries.
 pub fn rename<F, T>(from: F, to: T) -> io::Result<()>
 where
     F: AsRef<Path>,
@@ -183,7 +235,7 @@ where
 
     retry(Fibonacci::from_millis(1).take(21), || {
         match fs::rename(from, to) {
-            Ok(_) => OperationResult::Ok(()),
+            Ok(()) => OperationResult::Ok(()),
             Err(e) => match e.kind() {
                 io::ErrorKind::PermissionDenied => OperationResult::Retry(e),
                 _ => OperationResult::Err(e),

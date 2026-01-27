@@ -13,7 +13,7 @@ use crate::tool::{Node, Npm, Pnpm, Tool};
 use log::debug;
 use once_cell::unsync::OnceCell;
 
-pub(crate) mod serial;
+pub mod serial;
 pub mod tool;
 
 /// A hook for publishing Volta events.
@@ -33,8 +33,8 @@ pub struct LazyHookConfig {
 
 impl LazyHookConfig {
     /// Constructs a new `LazyHookConfig`
-    pub fn init() -> LazyHookConfig {
-        LazyHookConfig {
+    pub const fn init() -> Self {
+        Self {
             settings: OnceCell::new(),
         }
     }
@@ -78,7 +78,7 @@ pub struct YarnHooks {
 }
 
 impl<T: Tool> ToolHooks<T> {
-    /// Extends this ToolHooks with another, giving precendence to the current instance
+    /// Extends this `ToolHooks` with another, giving precendence to the current instance
     fn merge(self, other: Self) -> Self {
         Self {
             distro: self.distro.or(other.distro),
@@ -90,7 +90,7 @@ impl<T: Tool> ToolHooks<T> {
 }
 
 impl YarnHooks {
-    /// Extends this YarnHooks with another, giving precendence to the current instance
+    /// Extends this `YarnHooks` with another, giving precendence to the current instance
     fn merge(self, other: Self) -> Self {
         Self {
             distro: self.distro.or(other.distro),
@@ -111,23 +111,23 @@ macro_rules! merge_hooks {
 }
 
 impl HookConfig {
-    pub fn node(&self) -> Option<&ToolHooks<Node>> {
+    pub const fn node(&self) -> Option<&ToolHooks<Node>> {
         self.node.as_ref()
     }
 
-    pub fn npm(&self) -> Option<&ToolHooks<Npm>> {
+    pub const fn npm(&self) -> Option<&ToolHooks<Npm>> {
         self.npm.as_ref()
     }
 
-    pub fn pnpm(&self) -> Option<&ToolHooks<Pnpm>> {
+    pub const fn pnpm(&self) -> Option<&ToolHooks<Pnpm>> {
         self.pnpm.as_ref()
     }
 
-    pub fn yarn(&self) -> Option<&YarnHooks> {
+    pub const fn yarn(&self) -> Option<&YarnHooks> {
         self.yarn.as_ref()
     }
 
-    pub fn events(&self) -> Option<&EventHooks> {
+    pub const fn events(&self) -> Option<&EventHooks> {
         self.events.as_ref()
     }
 
@@ -215,7 +215,7 @@ impl HookConfig {
         raw.into_hook_config(hooks_path).map(Some)
     }
 
-    /// Merges this HookConfig with another, giving precedence to the current instance
+    /// Merges this `HookConfig` with another, giving precedence to the current instance
     fn merge(self, other: Self) -> Self {
         Self {
             node: merge_hooks!(self, other, node),
@@ -235,10 +235,10 @@ pub enum RegistryFormat {
 }
 
 impl RegistryFormat {
-    pub fn from_str(raw_format: &str) -> Fallible<RegistryFormat> {
+    pub fn from_str(raw_format: &str) -> Fallible<Self> {
         match raw_format {
-            "npm" => Ok(RegistryFormat::Npm),
-            "github" => Ok(RegistryFormat::Github),
+            "npm" => Ok(Self::Npm),
+            "github" => Ok(Self::Github),
             other => Err(ErrorKind::InvalidRegistryFormat {
                 format: String::from(other),
             }
@@ -254,7 +254,7 @@ pub struct EventHooks {
 }
 
 impl EventHooks {
-    /// Merges this EventHooks with another, giving precedence to the current instance
+    /// Merges this `EventHooks` with another, giving precedence to the current instance
     fn merge(self, other: Self) -> Self {
         Self {
             publish: self.publish.or(other.publish),

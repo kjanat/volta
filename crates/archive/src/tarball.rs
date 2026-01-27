@@ -20,9 +20,13 @@ pub struct Tarball {
 
 impl Tarball {
     /// Loads a tarball from the specified file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file metadata cannot be read.
     pub fn load(source: File) -> Result<Box<dyn Archive>, ArchiveError> {
         let compressed_size = source.metadata()?.len();
-        Ok(Box::new(Tarball {
+        Ok(Box::new(Self {
             compressed_size,
             data: Box::new(source),
             origin: Origin::Local,
@@ -32,6 +36,10 @@ impl Tarball {
     /// Initiate fetching of a tarball from the given URL, returning a
     /// tarball that can be streamed (and that tees its data to a local
     /// file as it streams).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the cache file cannot be created.
     pub fn fetch(url: &str, cache_file: &Path) -> Result<Box<dyn Archive>, ArchiveError> {
         let (status, headers, response) = attohttpc::get(url).send()?.split();
 
@@ -45,7 +53,7 @@ impl Tarball {
         let file = File::create(cache_file)?;
         let data = Box::new(TeeReader::new(response, file));
 
-        Ok(Box::new(Tarball {
+        Ok(Box::new(Self {
             compressed_size,
             data,
             origin: Origin::Remote,

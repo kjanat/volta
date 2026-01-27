@@ -26,7 +26,7 @@ pub struct V3 {
 
 impl V3 {
     pub fn new(home: PathBuf) -> Self {
-        V3 {
+        Self {
             home: v3::VoltaHome::new(home),
         }
     }
@@ -41,7 +41,7 @@ impl V3 {
             file: home.layout_file().to_owned(),
         })?;
 
-        Ok(V3 { home })
+        Ok(Self { home })
     }
 }
 
@@ -56,7 +56,7 @@ impl TryFrom<Empty> for V3 {
             dir: home.root().to_owned(),
         })?;
 
-        V3::complete_migration(home)
+        Self::complete_migration(home)
     }
 }
 
@@ -80,7 +80,7 @@ impl TryFrom<V2> for V3 {
         remove_dir_if_exists(old.home.package_inventory_dir())?;
 
         // Complete the migration, writing the V3 layout file
-        let layout = V3::complete_migration(new_home)?;
+        let layout = Self::complete_migration(new_home)?;
 
         // Remove the V2 layout file, since we're now on V3 (do this after writing the V3 file so that we know the migration succeeded)
         remove_file_if_exists(old.home.layout_file())?;
@@ -117,8 +117,7 @@ fn get_installed_packages(old_home: &v2::VoltaHome) -> Vec<LegacyPackageConfig> 
                         if let Some(name) = entry.path().file_stem() {
                             let name = name.to_string_lossy();
                             warn!(
-                                "Could not migrate {}. Please run `volta install {0}` to migrate the package manually.",
-                                name
+                                "Could not migrate {name}. Please run `volta install {name}` to migrate the package manually."
                             );
                         }
                     }
@@ -129,14 +128,14 @@ fn get_installed_packages(old_home: &v2::VoltaHome) -> Vec<LegacyPackageConfig> 
                 }
             }
             Err(error) => {
-                debug!("Error reading directory entry: {}", error);
+                debug!("Error reading directory entry: {error}");
                 None
             }
         })
         .collect()
 }
 
-/// Determine if a package has already been migrated by attempting to read the V3 PackageConfig
+/// Determine if a package has already been migrated by attempting to read the V3 `PackageConfig`
 fn is_migrated_config(config_path: &Path) -> bool {
     PackageConfig::from_file(config_path).is_ok()
 }

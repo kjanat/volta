@@ -9,22 +9,25 @@ use crate::error::{Context, ErrorKind, Fallible};
 use crate::hook::{RegistryFormat, YarnHooks};
 use crate::session::Session;
 use crate::style::progress_spinner;
-use crate::version::{parse_version, VersionSpec, VersionTag};
+use crate::version::{parse, VersionSpec, Tag};
 use attohttpc::Response;
 use log::debug;
-use node_semver::{Range, Version};
+use nodejs_semver::{Range, Version};
 
+/// # Errors
+///
+/// Returns an error if the version cannot be resolved.
 pub fn resolve(matching: VersionSpec, session: &mut Session) -> Fallible<Version> {
     let hooks = session.hooks()?.yarn();
     match matching {
-        VersionSpec::Semver(requirement) => resolve_semver(requirement, hooks),
+        VersionSpec::Semver(requirement) => resolve_semver(&requirement, hooks),
         VersionSpec::Exact(version) => Ok(version),
-        VersionSpec::None => resolve_tag(VersionTag::Latest, hooks),
+        VersionSpec::None => resolve_tag(Tag::Latest, hooks),
         VersionSpec::Tag(tag) => resolve_tag(tag, hooks),
     }
 }
 
-fn resolve_tag(tag: VersionTag, hooks: Option<&YarnHooks>) -> Fallible<Version> {
+fn resolve_tag(tag: Tag, hooks: Option<&YarnHooks>) -> Fallible<Version> {
     // This triage is complicated because we need to maintain the legacy behavior of hooks
     // First, if the tag is 'latest' and we have a 'latest' hook, we use the old behavior
     // Next, if the tag is 'latest' and we _do not_ have a 'latest' hook, we use the new behavior
@@ -33,7 +36,7 @@ fn resolve_tag(tag: VersionTag, hooks: Option<&YarnHooks>) -> Fallible<Version> 
     // Finally, we don't have any relevant hooks, so we can use the new behavior
     match (tag, hooks) {
         (
-            VersionTag::Latest,
+            Tag::Latest,
             Some(&YarnHooks {
                 latest: Some(ref hook),
                 ..
@@ -41,9 +44,9 @@ fn resolve_tag(tag: VersionTag, hooks: Option<&YarnHooks>) -> Fallible<Version> 
         ) => {
             debug!("Using yarn.latest hook to determine latest-version URL");
             // does yarn3 use latest-version? no
-            resolve_latest_legacy(hook.resolve("latest-version")?)
+            resolve_latest_legacy(&hook.resolve("latest-version")?)
         }
-        (VersionTag::Latest, _) => resolve_custom_tag(VersionTag::Latest.to_string()),
+        (Tag::Latest, _) => resolve_custom_tag(Tag::Latest.to_string()),
         (tag, Some(&YarnHooks { index: Some(_), .. })) => Err(ErrorKind::YarnVersionNotFound {
             matching: tag.to_string(),
         }
@@ -52,7 +55,7 @@ fn resolve_tag(tag: VersionTag, hooks: Option<&YarnHooks>) -> Fallible<Version> 
     }
 }
 
-fn resolve_semver(matching: Range, hooks: Option<&YarnHooks>) -> Fallible<Version> {
+fn resolve_semver(matching: &Range, hooks: Option<&YarnHooks>) -> Fallible<Version> {
     // For semver, the triage is less complicated: The previous behavior _always_ used
     // the 'index' hook, so we can check for that to decide which behavior to use.
     //
@@ -65,8 +68,8 @@ fn resolve_semver(matching: Range, hooks: Option<&YarnHooks>) -> Fallible<Versio
     {
         debug!("Using yarn.index hook to determine yarn index URL");
         match hook.format {
-            RegistryFormat::Github => resolve_semver_legacy(matching, hook.resolve("releases")?),
-            RegistryFormat::Npm => resolve_semver_npm(matching, hook.resolve("")?),
+            RegistryFormat::Github => resolve_semver_legacy(matching, &hook.resolve("releases")?),
+            RegistryFormat::Npm => resolve_semver_npm(matching, &hook.resolve("")?),
         }
     } else {
         resolve_semver_from_registry(matching)
@@ -80,44 +83,42 @@ fn fetch_yarn_index(package: &str) -> Fallible<(String, PackageIndex)> {
 
 fn resolve_custom_tag(tag: String) -> Fallible<Version> {
     // first try yarn2+, which uses "@yarnpkg/cli-dist" instead of "yarn"
-    if let Ok((url, mut index)) = fetch_yarn_index("@yarnpkg/cli-dist") {
-        if let Some(version) = index.tags.remove(&tag) {
-            debug!("Found yarn@{} matching tag '{}' from {}", version, tag, url);
+    if let Ok((url, mut index)) = fetch_yarn_index("@yarnpkg/cli-dist")
+        && let Some(version) = index.tags.remove(&tag) {
+            debug!("Found yarn@{version} matching tag '{tag}' from {url}");
             if version.major == 2 {
                 return Err(ErrorKind::Yarn2NotSupported.into());
             }
             return Ok(version);
         }
-    }
     debug!(
-        "Did not find yarn matching tag '{}' from @yarnpkg/cli-dist",
-        tag
+        "Did not find yarn matching tag '{tag}' from @yarnpkg/cli-dist"
     );
 
     let (url, mut index) = fetch_yarn_index("yarn")?;
     match index.tags.remove(&tag) {
         Some(version) => {
-            debug!("Found yarn@{} matching tag '{}' from {}", version, tag, url);
+            debug!("Found yarn@{version} matching tag '{tag}' from {url}");
             Ok(version)
         }
         None => Err(ErrorKind::YarnVersionNotFound { matching: tag }.into()),
     }
 }
 
-fn resolve_latest_legacy(url: String) -> Fallible<Version> {
-    let response_text = attohttpc::get(&url)
+fn resolve_latest_legacy(url: &str) -> Fallible<Version> {
+    let response_text = attohttpc::get(url)
         .send()
         .and_then(Response::error_for_status)
         .and_then(Response::text)
         .with_context(|| ErrorKind::YarnLatestFetchError {
-            from_url: url.clone(),
+            from_url: url.to_owned(),
         })?;
 
-    debug!("Found yarn latest version ({}) from {}", response_text, url);
-    parse_version(response_text)
+    debug!("Found yarn latest version ({response_text}) from {url}");
+    parse(response_text)
 }
 
-fn resolve_semver_from_registry(matching: Range) -> Fallible<Version> {
+fn resolve_semver_from_registry(matching: &Range) -> Fallible<Version> {
     // first try yarn2+, which uses "@yarnpkg/cli-dist" instead of "yarn"
     if let Ok((url, index)) = fetch_yarn_index("@yarnpkg/cli-dist") {
         let matching_entries: Vec<PackageDetails> = index
@@ -146,8 +147,7 @@ fn resolve_semver_from_registry(matching: Range) -> Fallible<Version> {
         }
     }
     debug!(
-        "Did not find yarn matching requirement '{}' for @yarnpkg/cli-dist",
-        matching
+        "Did not find yarn matching requirement '{matching}' for @yarnpkg/cli-dist"
     );
 
     let (url, index) = fetch_yarn_index("yarn")?;
@@ -173,35 +173,34 @@ fn resolve_semver_from_registry(matching: Range) -> Fallible<Version> {
     }
 }
 
-fn resolve_semver_legacy(matching: Range, url: String) -> Fallible<Version> {
-    let spinner = progress_spinner(format!("Fetching registry: {}", url));
-    let releases: RawYarnIndex = attohttpc::get(&url)
+fn resolve_semver_legacy(matching: &Range, url: &str) -> Fallible<Version> {
+    let spinner = progress_spinner(format!("Fetching registry: {url}"));
+    let releases: RawYarnIndex = attohttpc::get(url)
         .send()
         .and_then(Response::error_for_status)
         .and_then(Response::json)
-        .with_context(registry_fetch_error("Yarn", &url))?;
+        .with_context(registry_fetch_error("Yarn", url))?;
     let index = YarnIndex::from(releases);
     let releases = index.entries;
     spinner.finish_and_clear();
     let version_opt = releases.into_iter().rev().find(|v| matching.satisfies(v));
 
-    match version_opt {
-        Some(version) => {
-            debug!(
-                "Found yarn@{} matching requirement '{}' from {}",
-                version, matching, url
-            );
+    version_opt.map_or_else(
+        || {
+            Err(ErrorKind::YarnVersionNotFound {
+                matching: matching.to_string(),
+            }
+            .into())
+        },
+        |version| {
+            debug!("Found yarn@{version} matching requirement '{matching}' from {url}");
             Ok(version)
-        }
-        None => Err(ErrorKind::YarnVersionNotFound {
-            matching: matching.to_string(),
-        }
-        .into()),
-    }
+        },
+    )
 }
 
-fn resolve_semver_npm(matching: Range, url: String) -> Fallible<Version> {
-    let (url, index) = fetch_npm_registry(url, "Yarn")?;
+fn resolve_semver_npm(matching: &Range, url: &str) -> Fallible<Version> {
+    let (url, index) = fetch_npm_registry(url.to_owned(), "Yarn")?;
 
     let details_opt = index
         .entries

@@ -2,30 +2,31 @@ use std::fmt;
 use std::str::FromStr;
 
 use crate::error::{Context, ErrorKind, Fallible, VoltaError};
-use node_semver::{Range, Version};
+use nodejs_semver::{Range, Version};
 
 mod serial;
 
 #[derive(Debug, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
+#[allow(clippy::module_name_repetitions)]
 pub enum VersionSpec {
     /// No version specified (default)
     #[default]
     None,
 
-    /// SemVer Range
+    /// `SemVer` Range
     Semver(Range),
 
     /// Exact Version
     Exact(Version),
 
     /// Arbitrary Version Tag
-    Tag(VersionTag),
+    Tag(Tag),
 }
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub enum VersionTag {
+pub enum Tag {
     /// The 'latest' tag, a special case that exists for all packages
     Latest,
 
@@ -39,20 +40,20 @@ pub enum VersionTag {
 impl fmt::Display for VersionSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VersionSpec::None => write!(f, "<default>"),
-            VersionSpec::Semver(req) => req.fmt(f),
-            VersionSpec::Exact(version) => version.fmt(f),
-            VersionSpec::Tag(tag) => tag.fmt(f),
+            Self::None => write!(f, "<default>"),
+            Self::Semver(req) => req.fmt(f),
+            Self::Exact(version) => version.fmt(f),
+            Self::Tag(tag) => tag.fmt(f),
         }
     }
 }
 
-impl fmt::Display for VersionTag {
+impl fmt::Display for Tag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VersionTag::Latest => write!(f, "latest"),
-            VersionTag::Lts => write!(f, "lts"),
-            VersionTag::Custom(s) => s.fmt(f),
+            Self::Latest => write!(f, "latest"),
+            Self::Lts => write!(f, "lts"),
+            Self::Custom(s) => s.fmt(f),
         }
     }
 }
@@ -61,37 +62,43 @@ impl FromStr for VersionSpec {
     type Err = VoltaError;
 
     fn from_str(s: &str) -> Fallible<Self> {
-        if let Ok(version) = parse_version(s) {
-            Ok(VersionSpec::Exact(version))
-        } else if let Ok(req) = parse_requirements(s) {
-            Ok(VersionSpec::Semver(req))
-        } else {
-            s.parse().map(VersionSpec::Tag)
-        }
+        parse(s).map_or_else(
+            |_| {
+                parse_requirements(s)
+                    .map_or_else(|_| s.parse().map(Self::Tag), |req| Ok(Self::Semver(req)))
+            },
+            |version| Ok(Self::Exact(version)),
+        )
     }
 }
 
-impl FromStr for VersionTag {
+impl FromStr for Tag {
     type Err = VoltaError;
 
     fn from_str(s: &str) -> Fallible<Self> {
         if s == "latest" {
-            Ok(VersionTag::Latest)
+            Ok(Self::Latest)
         } else if s == "lts" {
-            Ok(VersionTag::Lts)
+            Ok(Self::Lts)
         } else {
-            Ok(VersionTag::Custom(s.into()))
+            Ok(Self::Custom(s.into()))
         }
     }
 }
 
+/// # Errors
+///
+/// Returns an error if the string cannot be parsed as a semver range.
 pub fn parse_requirements(s: impl AsRef<str>) -> Fallible<Range> {
     let s = s.as_ref();
     serial::parse_requirements(s)
         .with_context(|| ErrorKind::VersionParseError { version: s.into() })
 }
 
-pub fn parse_version(s: impl AsRef<str>) -> Fallible<Version> {
+/// # Errors
+///
+/// Returns an error if the string cannot be parsed as a semver version.
+pub fn parse(s: impl AsRef<str>) -> Fallible<Version> {
     let s = s.as_ref();
     s.parse()
         .with_context(|| ErrorKind::VersionParseError { version: s.into() })
@@ -100,16 +107,14 @@ pub fn parse_version(s: impl AsRef<str>) -> Fallible<Version> {
 // remove the leading 'v' from the version string, if present
 fn trim_version(s: &str) -> &str {
     let s = s.trim();
-    match s.strip_prefix('v') {
-        Some(stripped) => stripped,
-        None => s,
-    }
+    s.strip_prefix('v').unwrap_or(s)
 }
 
 // custom serialization and de-serialization for Version
 // because Version doesn't work with serde out of the box
+#[allow(clippy::module_name_repetitions)]
 pub mod version_serde {
-    use node_semver::Version;
+    use nodejs_semver::Version;
     use serde::de::{Error, Visitor};
     use serde::{self, Deserializer, Serializer};
     use std::fmt;
@@ -132,6 +137,9 @@ pub mod version_serde {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails.
     pub fn serialize<S>(version: &Version, s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -139,6 +147,9 @@ pub mod version_serde {
         s.serialize_str(&version.to_string())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if deserialization fails.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Version, D::Error>
     where
         D: Deserializer<'de>,
@@ -150,10 +161,13 @@ pub mod version_serde {
 // custom serialization and de-serialization for Option<Version>
 // because Version doesn't work with serde out of the box
 pub mod option_version_serde {
-    use node_semver::Version;
+    use nodejs_semver::Version;
     use serde::de::Error;
     use serde::{self, Deserialize, Deserializer, Serializer};
 
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails.
     pub fn serialize<S>(version: &Option<Version>, s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -164,6 +178,9 @@ pub mod option_version_serde {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if deserialization fails.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Version>, D::Error>
     where
         D: Deserializer<'de>,
@@ -182,13 +199,16 @@ pub mod option_version_serde {
 // because Version doesn't work with serde out of the box
 pub mod hashmap_version_serde {
     use super::version_serde;
-    use node_semver::Version;
+    use nodejs_semver::Version;
     use serde::{self, Deserialize, Deserializer};
     use std::collections::HashMap;
 
     #[derive(Deserialize)]
     struct Wrapper(#[serde(deserialize_with = "version_serde::deserialize")] Version);
 
+    /// # Errors
+    ///
+    /// Returns an error if deserialization fails.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<String, Version>, D::Error>
     where
         D: Deserializer<'de>,

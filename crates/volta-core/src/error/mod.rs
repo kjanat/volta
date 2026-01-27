@@ -5,13 +5,16 @@ use std::process::exit;
 mod kind;
 mod reporter;
 
+#[allow(clippy::module_name_repetitions)]
 pub use kind::ErrorKind;
+#[allow(clippy::module_name_repetitions)]
 pub use reporter::report_error;
 
 pub type Fallible<T> = Result<T, VoltaError>;
 
 /// Error type for Volta
 #[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct VoltaError {
     inner: Box<Inner>,
 }
@@ -24,16 +27,17 @@ struct Inner {
 
 impl VoltaError {
     /// The exit code Volta should use when this error stops execution
+    #[must_use]
     pub fn exit_code(&self) -> ExitCode {
         self.inner.kind.exit_code()
     }
 
-    /// Create a new VoltaError instance including a source error
+    /// Create a new `VoltaError` instance including a source error
     pub fn from_source<E>(source: E, kind: ErrorKind) -> Self
     where
         E: Into<Box<dyn Error>>,
     {
-        VoltaError {
+        Self {
             inner: Box::new(Inner {
                 kind,
                 source: Some(source.into()),
@@ -41,7 +45,8 @@ impl VoltaError {
         }
     }
 
-    /// Get a reference to the ErrorKind for this error
+    /// Get a reference to the `ErrorKind` for this error
+    #[must_use]
     pub fn kind(&self) -> &ErrorKind {
         &self.inner.kind
     }
@@ -55,20 +60,23 @@ impl fmt::Display for VoltaError {
 
 impl Error for VoltaError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.inner.source.as_ref().map(|b| b.as_ref())
+        self.inner.source.as_ref().map(std::convert::AsRef::as_ref)
     }
 }
 
 impl From<ErrorKind> for VoltaError {
     fn from(kind: ErrorKind) -> Self {
-        VoltaError {
+        Self {
             inner: Box::new(Inner { kind, source: None }),
         }
     }
 }
 
-/// Trait providing the with_context method to easily convert any Result error into a VoltaError
+/// Trait providing the `with_context` method to easily convert any Result error into a `VoltaError`
 pub trait Context<T> {
+    /// # Errors
+    ///
+    /// Returns a `VoltaError` if the underlying result is an error.
     fn with_context<F>(self, f: F) -> Fallible<T>
     where
         F: FnOnce() -> ErrorKind;

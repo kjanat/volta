@@ -8,12 +8,17 @@ use crate::platform::{Platform, System};
 use crate::session::{ActivityKind, Session};
 
 /// Build a `ToolCommand` for Node
-pub(super) fn command(args: &[OsString], session: &mut Session) -> Fallible<Executor> {
+pub(super) fn command(
+    args: &[OsString],
+    session: &mut Session,
+    ignore_recursion: bool,
+) -> Fallible<Executor> {
     session.add_event_start(ActivityKind::Node);
-    // Don't re-evaluate the platform if this is a recursive call
-    let platform = match env::var_os(RECURSION_ENV_VAR) {
-        Some(_) => None,
-        None => Platform::current(session)?,
+    // Don't re-evaluate the platform if this is a recursive call (unless ignore_recursion is set)
+    let platform = if !ignore_recursion && env::var_os(RECURSION_ENV_VAR).is_some() {
+        None
+    } else {
+        Platform::current(session)?
     };
 
     Ok(ToolCommand::new("node", args, platform, ToolKind::Node).into())
@@ -24,18 +29,15 @@ pub(super) fn execution_context(
     platform: Option<Platform>,
     session: &mut Session,
 ) -> Fallible<(OsString, ErrorKind)> {
-    match platform {
-        Some(plat) => {
-            let image = plat.checkout(session)?;
-            let path = image.path()?;
-            debug_active_image(&image);
+    if let Some(plat) = platform {
+        let image = plat.checkout(session)?;
+        let path = image.path()?;
+        debug_active_image(&image);
 
-            Ok((path, ErrorKind::BinaryExecError))
-        }
-        None => {
-            let path = System::path()?;
-            debug_no_platform();
-            Ok((path, ErrorKind::NoPlatform))
-        }
+        Ok((path, ErrorKind::BinaryExecError))
+    } else {
+        let path = System::path()?;
+        debug_no_platform();
+        Ok((path, ErrorKind::NoPlatform))
     }
 }

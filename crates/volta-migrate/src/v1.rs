@@ -20,7 +20,7 @@ pub struct V1 {
 
 impl V1 {
     pub fn new(home: PathBuf) -> Self {
-        V1 {
+        Self {
             home: v1::VoltaHome::new(home),
         }
     }
@@ -35,14 +35,14 @@ impl V1 {
             file: home.layout_file().to_owned(),
         })?;
 
-        Ok(V1 { home })
+        Ok(Self { home })
     }
 }
 
 impl TryFrom<Empty> for V1 {
     type Error = VoltaError;
 
-    fn try_from(old: Empty) -> Fallible<V1> {
+    fn try_from(old: Empty) -> Fallible<Self> {
         debug!("New Volta installation detected, creating fresh layout");
 
         let home = v1::VoltaHome::new(old.home);
@@ -50,14 +50,14 @@ impl TryFrom<Empty> for V1 {
             dir: home.root().to_owned(),
         })?;
 
-        V1::complete_migration(home)
+        Self::complete_migration(home)
     }
 }
 
 impl TryFrom<V0> for V1 {
     type Error = VoltaError;
 
-    fn try_from(old: V0) -> Fallible<V1> {
+    fn try_from(old: V0) -> Fallible<Self> {
         debug!("Existing Volta installation detected, migrating from V0 layout");
 
         let new_home = v1::VoltaHome::new(old.home.root().to_owned());
@@ -76,12 +76,11 @@ impl TryFrom<V0> for V1 {
                 })?;
             for (entry, _) in root_contents {
                 let path = entry.path();
-                if let Some(stem) = path.file_stem() {
-                    if stem == "load" && path.is_file() {
+                if let Some(stem) = path.file_stem()
+                    && stem == "load" && path.is_file() {
                         remove_file(&path)
                             .with_context(|| ErrorKind::DeleteFileError { file: path })?;
                     }
-                }
             }
 
             debug!("Removing old Volta binaries");
@@ -93,6 +92,6 @@ impl TryFrom<V0> for V1 {
             remove_file_if_exists(old_shim_bin)?;
         }
 
-        V1::complete_migration(new_home)
+        Self::complete_migration(new_home)
     }
 }

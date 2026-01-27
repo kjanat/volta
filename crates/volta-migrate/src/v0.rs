@@ -12,7 +12,7 @@ pub struct V0 {
 
 impl V0 {
     pub fn new(home: PathBuf) -> Self {
-        V0 {
+        Self {
             home: VoltaHome::new(home),
         }
     }

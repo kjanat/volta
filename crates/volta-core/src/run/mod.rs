@@ -5,11 +5,11 @@ use std::path::Path;
 use std::process::ExitStatus;
 
 use crate::error::{ErrorKind, Fallible};
-use crate::platform::{CliPlatform, Image, Sourced};
+use crate::platform::{Overrides, Image, Sourced};
 use crate::session::Session;
 use crate::VOLTA_FEATURE_PNPM;
 use log::debug;
-use node_semver::Version;
+use nodejs_semver::Version;
 
 pub mod binary;
 mod executor;
@@ -35,31 +35,37 @@ const RECURSION_ENV_VAR: &str = "_VOLTA_TOOL_RECURSION";
 const VOLTA_BYPASS: &str = "VOLTA_BYPASS";
 
 /// Execute a shim command, based on the command-line arguments to the current process
+///
+/// # Errors
+///
+/// Returns an error if the shim cannot be executed.
 pub fn execute_shim(session: &mut Session) -> Fallible<ExitStatus> {
     let mut native_args = env::args_os();
     let exe = get_tool_name(&mut native_args)?;
     let args: Vec<_> = native_args.collect();
 
-    get_executor(&exe, &args, session)?.execute(session)
+    get_executor(&exe, &args, session, false)?.execute(session)
 }
 
 /// Execute a tool with the provided arguments
+///
+/// # Errors
+///
+/// Returns an error if the tool cannot be executed.
 pub fn execute_tool<K, V, S>(
     exe: &OsStr,
     args: &[OsString],
     envs: &HashMap<K, V, S>,
-    cli: CliPlatform,
+    cli: Overrides,
     session: &mut Session,
 ) -> Fallible<ExitStatus>
 where
     K: AsRef<OsStr>,
     V: AsRef<OsStr>,
 {
-    // Remove the recursion environment variable so that the context is correctly re-evaluated
-    // when calling `volta run` (even when called from a Node script)
-    env::remove_var(RECURSION_ENV_VAR);
-
-    let mut runner = get_executor(exe, args, session)?;
+    // Pass ignore_recursion=true so the platform is re-evaluated even if RECURSION_ENV_VAR is set
+    // This is needed when `volta run` is called from within a Node script
+    let mut runner = get_executor(exe, args, session, true)?;
     runner.cli_platform(cli);
     runner.envs(envs);
 
@@ -67,10 +73,15 @@ where
 }
 
 /// Get the appropriate Tool command, based on the requested executable and arguments
+///
+/// When `ignore_recursion` is true, the recursion environment variable check is skipped,
+/// allowing the platform to be re-evaluated. This is used by `volta run` to ensure fresh
+/// platform evaluation even when called from within a Node script.
 fn get_executor(
     exe: &OsStr,
     args: &[OsString],
     session: &mut Session,
+    ignore_recursion: bool,
 ) -> Fallible<executor::Executor> {
     if env::var_os(VOLTA_BYPASS).is_some() {
         Ok(executor::ToolCommand::new(
@@ -83,20 +94,20 @@ fn get_executor(
     } else {
         match exe.to_str() {
             Some("volta-shim") => Err(ErrorKind::RunShimDirectly.into()),
-            Some("node") => node::command(args, session),
-            Some("npm") => npm::command(args, session),
-            Some("npx") => npx::command(args, session),
+            Some("node") => node::command(args, session, ignore_recursion),
+            Some("npm") => npm::command(args, session, ignore_recursion),
+            Some("npx") => npx::command(args, session, ignore_recursion),
             Some("pnpm") => {
                 // If the pnpm feature flag variable is set, delegate to the pnpm handler
                 // If not, use the binary handler as a fallback (prior to pnpm support, installing
                 // pnpm would be handled the same as any other global binary)
                 if env::var_os(VOLTA_FEATURE_PNPM).is_some() {
-                    pnpm::command(args, session)
+                    pnpm::command(args, session, ignore_recursion)
                 } else {
                     binary::command(exe, args, session)
                 }
             }
-            Some("yarn") | Some("yarnpkg") => yarn::command(args, session),
+            Some("yarn" | "yarnpkg") => yarn::command(args, session, ignore_recursion),
             _ => binary::command(exe, args, session),
         }
     }
@@ -144,20 +155,14 @@ fn debug_active_image(image: &Image) {
         image
             .resolve_npm()
             .ok()
-            .as_ref()
-            .map(format_tool_version)
-            .unwrap_or_else(|| "Bundled with Node".into()),
+            .as_ref().map_or_else(|| "Bundled with Node".into(), format_tool_version),
         image
             .pnpm
-            .as_ref()
-            .map(format_tool_version)
-            .unwrap_or_else(|| "None".into()),
+            .as_ref().map_or_else(|| "None".into(), format_tool_version),
         image
             .yarn
-            .as_ref()
-            .map(format_tool_version)
-            .unwrap_or_else(|| "None".into()),
-    )
+            .as_ref().map_or_else(|| "None".into(), format_tool_version),
+    );
 }
 
 fn format_tool_version(version: &Sourced<Version>) -> String {
