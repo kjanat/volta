@@ -1,3 +1,47 @@
+//! Procedural macro for defining Volta directory layout hierarchies.
+//!
+//! This crate provides the [`layout!`] macro, which generates type-safe structs
+//! representing filesystem directory trees. Each struct field corresponds to a
+//! path within the hierarchy, with automatic path construction from a root directory.
+//!
+//! # Generated Code
+//!
+//! For each struct defined in `layout!`, the macro generates:
+//!
+//! - A struct with `PathBuf` fields for each entry (files and directories)
+//! - A `new(root: PathBuf) -> Self` constructor
+//! - Accessor methods returning `&Path` for each field
+//! - A `root() -> &Path` method returning the root directory
+//! - A `create() -> io::Result<()>` method that creates all subdirectories
+//!
+//! # DSL Syntax
+//!
+//! ```text
+//! layout! {
+//!     [attributes]
+//!     [visibility] struct StructName {
+//!         "filename": field_name;              // File entry
+//!         "dirname": field_name {}             // Empty directory
+//!         "dirname": field_name {              // Directory with contents
+//!             "nested": nested_field;          // Nested entries...
+//!         }
+//!         "name[.exe]": field_name;            // Executable (platform-aware)
+//!     }
+//! }
+//! ```
+//!
+//! ## Entry Types
+//!
+//! - **Files**: Declared with `"filename": field_name;` (semicolon terminator)
+//! - **Directories**: Declared with `"dirname": field_name { ... }` (braces, may be empty)
+//! - **Executables**: Use `[.exe]` suffix (e.g., `"volta[.exe]"`) - expands to `.exe` on
+//!   Windows, empty string on Unix via [`std::env::consts::EXE_SUFFIX`]
+//!
+//! # Example
+//!
+//! See [`volta_layout::v1`](../volta_layout/v1/index.html) for real-world usage defining
+//! `VoltaHome` and `VoltaInstall` directory structures.
+
 #![recursion_limit = "128"]
 
 extern crate proc_macro;
