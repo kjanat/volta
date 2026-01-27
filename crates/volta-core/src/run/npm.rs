@@ -8,7 +8,7 @@ use super::{debug_active_image, debug_no_platform, RECURSION_ENV_VAR};
 use crate::error::{ErrorKind, Fallible};
 use crate::platform::{Platform, System};
 use crate::session::{ActivityKind, Session};
-use crate::tool::{PackageManifest, Spec};
+use crate::tool::{PackageManifest, ToolSpec};
 use crate::version::VersionSpec;
 
 /// Build an `Executor` for npm
@@ -49,9 +49,11 @@ pub(super) fn command(
                 if let Some(name) = current_project_name(session) {
                     // Same as for link, only intercept if a platform exists
                     if Platform::current(session)?.is_some() {
-                        return Ok(
-                            UninstallCommand::new(Spec::Package(name, VersionSpec::None)).into(),
-                        );
+                        return Ok(UninstallCommand::new(ToolSpec::Package(
+                            name,
+                            VersionSpec::None,
+                        ))
+                        .into());
                     }
                 }
             }

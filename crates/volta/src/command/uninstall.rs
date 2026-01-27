@@ -15,13 +15,13 @@ impl Command for Uninstall {
     fn run(self, session: &mut Session) -> Fallible<ExitCode> {
         session.add_event_start(ActivityKind::Uninstall);
 
-        let tool = tool::Spec::try_from_str(&self.tool)?;
+        let tool = tool::ToolSpec::try_from_str(&self.tool)?;
 
         // For packages, specifically report that we do not support uninstalling
         // specific versions. For runtimes and package managers, we currently
         // *intentionally* let this fall through to inform the user that we do
         // not support uninstalling those *at all*.
-        if let tool::Spec::Package(_name, version) = &tool {
+        if let tool::ToolSpec::Package(_name, version) = &tool {
             let VersionSpec::None = version else {
                 return Err(ErrorKind::Unimplemented {
                     feature: "uninstalling specific versions of tools".into(),

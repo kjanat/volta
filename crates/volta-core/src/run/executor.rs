@@ -16,7 +16,7 @@ use crate::signal::pass_control_to_shim;
 use crate::style::{note_prefix, tool_version};
 use crate::sync::VoltaLock;
 use crate::tool::package::{DirectInstall, InPlaceUpgrade, PackageConfig, PackageManager};
-use crate::tool::Spec;
+use crate::tool::ToolSpec;
 use log::{info, warn};
 
 pub enum Executor {
@@ -500,11 +500,11 @@ impl From<PackageUpgradeCommand> for Executor {
 /// Note: This is not intended to be used for Package installs. Those should go through the
 /// `PackageInstallCommand` above, to more seamlessly integrate with the package manager
 pub struct InternalInstallCommand {
-    tool: Spec,
+    tool: ToolSpec,
 }
 
 impl InternalInstallCommand {
-    pub const fn new(tool: Spec) -> Self {
+    pub const fn new(tool: ToolSpec) -> Self {
         Self { tool }
     }
 
@@ -533,11 +533,11 @@ impl From<InternalInstallCommand> for Executor {
 /// This will use the `volta uninstall` logic to correctly ensure that the package is fully
 /// uninstalled
 pub struct UninstallCommand {
-    tool: Spec,
+    tool: ToolSpec,
 }
 
 impl UninstallCommand {
-    pub const fn new(tool: Spec) -> Self {
+    pub const fn new(tool: ToolSpec) -> Self {
         Self { tool }
     }
 

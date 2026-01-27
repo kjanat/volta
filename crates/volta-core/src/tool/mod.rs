@@ -80,7 +80,8 @@ pub trait Tool: Display {
 /// Specification for a tool and its associated version.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub enum Spec {
+#[allow(clippy::module_name_repetitions)]
+pub enum ToolSpec {
     Node(VersionSpec),
     Npm(VersionSpec),
     Pnpm(VersionSpec),
@@ -88,7 +89,7 @@ pub enum Spec {
     Package(String, VersionSpec),
 }
 
-impl Spec {
+impl ToolSpec {
     /// Resolve a tool spec into a fully realized Tool that can be fetched
     ///
     /// # Errors
@@ -178,7 +179,7 @@ impl Spec {
     }
 }
 
-impl Display for Spec {
+impl Display for ToolSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             Self::Node(version) => tool_version("node", version),
@@ -230,7 +231,7 @@ where
     }
 }
 
-fn download_tool_error(tool: Spec, from_url: impl AsRef<str>) -> impl FnOnce() -> ErrorKind {
+fn download_tool_error(tool: ToolSpec, from_url: impl AsRef<str>) -> impl FnOnce() -> ErrorKind {
     let from_url = from_url.as_ref().to_string();
     || ErrorKind::DownloadToolNetworkError { tool, from_url }
 }

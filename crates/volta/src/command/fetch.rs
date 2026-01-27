@@ -15,7 +15,7 @@ impl Command for Fetch {
     fn run(self, session: &mut Session) -> Fallible<ExitCode> {
         session.add_event_start(ActivityKind::Fetch);
 
-        for tool in tool::Spec::from_strings(&self.tools, "fetch")? {
+        for tool in tool::ToolSpec::from_strings(&self.tools, "fetch")? {
             tool.resolve(session)?.fetch(session)?;
         }
 

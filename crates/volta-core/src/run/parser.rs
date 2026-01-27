@@ -10,7 +10,7 @@ use crate::error::{ErrorKind, Fallible};
 use crate::inventory::package_configs;
 use crate::platform::{Platform, PlatformSpec};
 use crate::tool::package::PackageManager;
-use crate::tool::Spec;
+use crate::tool::ToolSpec;
 use log::debug;
 
 const UNSAFE_GLOBAL: &str = "VOLTA_UNSAFE_GLOBAL";
@@ -308,8 +308,8 @@ impl InstallArgs<'_> {
             // External tool installs may be in a form that doesn't match a `Spec` (such as a git
             // URL or path to a tarball). If parsing into a `Spec` fails, we assume that it's a
             // 3rd-party Tool and attempt to install anyway.
-            match Spec::try_from_str(&tool.to_string_lossy()) {
-                Ok(Spec::Package(_, _)) | Err(_) => {
+            match ToolSpec::try_from_str(&tool.to_string_lossy()) {
+                Ok(ToolSpec::Package(_, _)) | Err(_) => {
                     let platform = platform_spec.as_default();
                     // The args for an individual install command are the common args combined
                     // with the name of the tool.
@@ -338,7 +338,7 @@ impl UninstallArgs<'_> {
         let mut executors = Vec::with_capacity(self.tools.len());
 
         for tool_name in self.tools {
-            let tool = Spec::try_from_str(&tool_name.to_string_lossy())?;
+            let tool = ToolSpec::try_from_str(&tool_name.to_string_lossy())?;
             executors.push(UninstallCommand::new(tool).into());
         }
 
@@ -370,8 +370,8 @@ impl UpgradeArgs<'_> {
         let mut executors = Vec::with_capacity(self.tools.len());
 
         for tool in self.tools {
-            match Spec::try_from_str(&tool.to_string_lossy()) {
-                Ok(Spec::Package(package, _)) => {
+            match ToolSpec::try_from_str(&tool.to_string_lossy()) {
+                Ok(ToolSpec::Package(package, _)) => {
                     let platform = platform_spec.as_default();
                     let args = self.common_args.iter().chain(once(&tool));
                     executors.push(

@@ -107,7 +107,7 @@ pub enum ErrorKind {
     },
 
     DownloadToolNetworkError {
-        tool: tool::Spec,
+        tool: tool::ToolSpec,
         from_url: String,
     },
 
