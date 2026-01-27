@@ -5,7 +5,7 @@ use super::super::registry::{
 };
 use super::super::registry_fetch_error;
 use super::metadata::{RawYarnIndex, YarnIndex};
-use crate::error::{Context, ErrorKind, Fallible, NetworkError};
+use crate::error::{Context, ErrorKind, Fallible, NetworkError, VersionError};
 use crate::hook::{RegistryFormat, YarnHooks};
 use crate::session::Session;
 use crate::style::progress_spinner;
@@ -47,10 +47,12 @@ fn resolve_tag(tag: Tag, hooks: Option<&YarnHooks>) -> Fallible<Version> {
             resolve_latest_legacy(&hook.resolve("latest-version")?)
         }
         (Tag::Latest, _) => resolve_custom_tag(Tag::Latest.to_string()),
-        (tag, Some(&YarnHooks { index: Some(_), .. })) => Err(ErrorKind::YarnVersionNotFound {
-            matching: tag.to_string(),
+        (tag, Some(&YarnHooks { index: Some(_), .. })) => {
+            Err(ErrorKind::Version(VersionError::YarnNotFound {
+                matching: tag.to_string(),
+            })
+            .into())
         }
-        .into()),
         (tag, _) => resolve_custom_tag(tag.to_string()),
     }
 }
@@ -88,7 +90,7 @@ fn resolve_custom_tag(tag: String) -> Fallible<Version> {
     {
         debug!("Found yarn@{version} matching tag '{tag}' from {url}");
         if version.major == 2 {
-            return Err(ErrorKind::Yarn2NotSupported.into());
+            return Err(ErrorKind::Version(VersionError::Yarn2NotSupported).into());
         }
         return Ok(version);
     }
@@ -100,7 +102,7 @@ fn resolve_custom_tag(tag: String) -> Fallible<Version> {
             debug!("Found yarn@{version} matching tag '{tag}' from {url}");
             Ok(version)
         }
-        None => Err(ErrorKind::YarnVersionNotFound { matching: tag }.into()),
+        None => Err(ErrorKind::Version(VersionError::YarnNotFound { matching: tag }).into()),
     }
 }
 
@@ -142,7 +144,7 @@ fn resolve_semver_from_registry(matching: &Range) -> Fallible<Version> {
                     return Ok(details.version.clone());
                 }
                 None => {
-                    return Err(ErrorKind::Yarn2NotSupported.into());
+                    return Err(ErrorKind::Version(VersionError::Yarn2NotSupported).into());
                 }
             }
         }
@@ -165,9 +167,9 @@ fn resolve_semver_from_registry(matching: &Range) -> Fallible<Version> {
             Ok(details.version)
         }
         // at this point Yarn is not found in either registry
-        None => Err(ErrorKind::YarnVersionNotFound {
+        None => Err(ErrorKind::Version(VersionError::YarnNotFound {
             matching: matching.to_string(),
-        }
+        })
         .into()),
     }
 }
@@ -186,9 +188,9 @@ fn resolve_semver_legacy(matching: &Range, url: &str) -> Fallible<Version> {
 
     version_opt.map_or_else(
         || {
-            Err(ErrorKind::YarnVersionNotFound {
+            Err(ErrorKind::Version(VersionError::YarnNotFound {
                 matching: matching.to_string(),
-            }
+            })
             .into())
         },
         |version| {
@@ -214,9 +216,9 @@ fn resolve_semver_npm(matching: &Range, url: &str) -> Fallible<Version> {
             );
             Ok(details.version)
         }
-        None => Err(ErrorKind::YarnVersionNotFound {
+        None => Err(ErrorKind::Version(VersionError::YarnNotFound {
             matching: matching.to_string(),
-        }
+        })
         .into()),
     }
 }

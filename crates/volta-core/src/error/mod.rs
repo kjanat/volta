@@ -28,6 +28,8 @@ pub use network::NetworkError;
 pub use reporter::report_error;
 #[allow(clippy::module_name_repetitions)]
 pub use shim::ShimError;
+#[allow(clippy::module_name_repetitions)]
+pub use version::VersionError;
 
 pub type Fallible<T> = Result<T, VoltaError>;
 

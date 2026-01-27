@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::error::{Context, ErrorKind, Fallible, VoltaError};
+use crate::error::{Context, ErrorKind, Fallible, VersionError, VoltaError};
 use nodejs_semver::{Range, Version};
 
 mod serial;
@@ -92,7 +92,7 @@ impl FromStr for Tag {
 pub fn parse_requirements(s: impl AsRef<str>) -> Fallible<Range> {
     let s = s.as_ref();
     serial::parse_requirements(s)
-        .with_context(|| ErrorKind::VersionParseError { version: s.into() })
+        .with_context(|| ErrorKind::Version(VersionError::ParseFailed { version: s.into() }))
 }
 
 /// # Errors
@@ -101,7 +101,7 @@ pub fn parse_requirements(s: impl AsRef<str>) -> Fallible<Range> {
 pub fn parse(s: impl AsRef<str>) -> Fallible<Version> {
     let s = s.as_ref();
     s.parse()
-        .with_context(|| ErrorKind::VersionParseError { version: s.into() })
+        .with_context(|| ErrorKind::Version(VersionError::ParseFailed { version: s.into() }))
 }
 
 // remove the leading 'v' from the version string, if present

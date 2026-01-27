@@ -1,9 +1,9 @@
 //! Provides resolution of npm Version requirements into specific versions
 
 use super::super::registry::{
-    PackageDetails, PackageIndex, fetch_npm_registry, public_registry_index,
+    fetch_npm_registry, public_registry_index, PackageDetails, PackageIndex,
 };
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{ErrorKind, Fallible, VersionError};
 use crate::hook::ToolHooks;
 use crate::session::Session;
 use crate::tool::Npm;
@@ -45,9 +45,9 @@ fn resolve_tag(tag: &str, hooks: Option<&ToolHooks<Npm>>) -> Fallible<Version> {
 
     index.tags.remove(tag).map_or_else(
         || {
-            Err(ErrorKind::NpmVersionNotFound {
+            Err(ErrorKind::Version(VersionError::NpmNotFound {
                 matching: tag.into(),
-            }
+            })
             .into())
         },
         |version| {
@@ -73,9 +73,9 @@ fn resolve_semver(matching: &Range, hooks: Option<&ToolHooks<Npm>>) -> Fallible<
             );
             Ok(details.version)
         }
-        None => Err(ErrorKind::NpmVersionNotFound {
+        None => Err(ErrorKind::Version(VersionError::NpmNotFound {
             matching: matching.to_string(),
-        }
+        })
         .into()),
     }
 }

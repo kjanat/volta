@@ -1,10 +1,10 @@
 use log::debug;
 use nodejs_semver::{Range, Version};
 
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{ErrorKind, Fallible, VersionError};
 use crate::hook::ToolHooks;
 use crate::session::Session;
-use crate::tool::registry::{PackageIndex, fetch_npm_registry, public_registry_index};
+use crate::tool::registry::{fetch_npm_registry, public_registry_index, PackageIndex};
 use crate::tool::{PackageDetails, Pnpm};
 use crate::version::{Tag, VersionSpec};
 
@@ -26,9 +26,9 @@ fn resolve_tag(tag: &str, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible<Version> 
 
     index.tags.remove(tag).map_or_else(
         || {
-            Err(ErrorKind::PnpmVersionNotFound {
+            Err(ErrorKind::Version(VersionError::PnpmNotFound {
                 matching: tag.into(),
-            }
+            })
             .into())
         },
         |version| {
@@ -54,9 +54,9 @@ fn resolve_semver(matching: &Range, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible
             );
             Ok(details.version)
         }
-        None => Err(ErrorKind::PnpmVersionNotFound {
+        None => Err(ErrorKind::Version(VersionError::PnpmNotFound {
             matching: matching.to_string(),
-        }
+        })
         .into()),
     }
 }

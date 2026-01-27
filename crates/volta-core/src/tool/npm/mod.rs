@@ -5,7 +5,7 @@ use super::{
     FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
     info_installed, info_pinned, info_project_version,
 };
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, VersionError};
 use crate::inventory::npm_available;
 use crate::session::Session;
 use crate::style::{success_prefix, tool_version};
@@ -115,16 +115,16 @@ impl Tool for Bundled {
         let bundled_version = match toolchain.platform() {
             Some(platform) => {
                 let version = load_default_npm_version(&platform.node).with_context(|| {
-                    ErrorKind::NoBundledNpm {
+                    ErrorKind::Version(VersionError::NoBundledNpm {
                         command: "install".into(),
-                    }
+                    })
                 })?;
                 version.to_string()
             }
             None => {
-                return Err(ErrorKind::NoBundledNpm {
+                return Err(ErrorKind::Version(VersionError::NoBundledNpm {
                     command: "install".into(),
-                }
+                })
                 .into());
             }
         };
@@ -147,16 +147,16 @@ impl Tool for Bundled {
                     Some(platform) => {
                         let version =
                             load_default_npm_version(&platform.node).with_context(|| {
-                                ErrorKind::NoBundledNpm {
+                                ErrorKind::Version(VersionError::NoBundledNpm {
                                     command: "pin".into(),
-                                }
+                                })
                             })?;
                         version.to_string()
                     }
                     None => {
-                        return Err(ErrorKind::NoBundledNpm {
+                        return Err(ErrorKind::Version(VersionError::NoBundledNpm {
                             command: "pin".into(),
-                        }
+                        })
                         .into());
                     }
                 };

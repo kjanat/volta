@@ -5,6 +5,7 @@ use super::binary::BinaryError;
 use super::filesystem::FilesystemError;
 use super::network::NetworkError;
 use super::shim::ShimError;
+use super::version::VersionError;
 use super::ExitCode;
 use crate::style::{text_width, tool_version};
 use crate::tool::package::PackageManager;
@@ -31,6 +32,9 @@ pub enum ErrorKind {
 
     /// Wrapper for shim-related errors.
     Shim(ShimError),
+
+    /// Wrapper for version-related errors.
+    Version(VersionError),
 
     /// Thrown when building the virtual environment path fails
     BuildPathError,
@@ -138,11 +142,6 @@ pub enum ErrorKind {
     /// Thrown when unable to acquire a lock on the Volta directory
     LockAcquireError,
 
-    /// Thrown when pinning or installing npm@bundled and couldn't detect the bundled version
-    NoBundledNpm {
-        command: String,
-    },
-
     /// Thrown when pnpm is not set at the command-line
     NoCommandLinePnpm,
 
@@ -152,11 +151,6 @@ pub enum ErrorKind {
     /// Thrown when a user tries to install a Yarn or npm version before installing a Node version.
     NoDefaultNodeVersion {
         tool: String,
-    },
-
-    /// Thrown when there is no Node version matching a requested semver specifier.
-    NodeVersionNotFound {
-        matching: String,
     },
 
     NoHomeEnvironmentVar,
@@ -206,11 +200,6 @@ pub enum ErrorKind {
     /// Thrown when `npm link` is called with a package that was not installed / linked with npm
     NpmLinkWrongManager {
         package: String,
-    },
-
-    /// Thrown when there is no npm version matching the requested Semver/Tag
-    NpmVersionNotFound {
-        matching: String,
     },
 
     NpxNotAvailable {
@@ -280,11 +269,6 @@ pub enum ErrorKind {
         tool: String,
     },
 
-    /// Thrown when there is no pnpm version matching a requested semver specifier.
-    PnpmVersionNotFound {
-        matching: String,
-    },
-
     /// Thrown when a publish hook contains both the url and bin fields
     PublishHookBothUrlAndBin,
 
@@ -334,18 +318,6 @@ pub enum ErrorKind {
         package: String,
         manager: PackageManager,
     },
-
-    VersionParseError {
-        version: String,
-    },
-
-    /// Thrown when a user attempts to install a version of Yarn2
-    Yarn2NotSupported,
-
-    /// Thrown when there is no Yarn version matching a requested semver specifier.
-    YarnVersionNotFound {
-        matching: String,
-    },
 }
 
 impl fmt::Display for ErrorKind {
@@ -356,6 +328,7 @@ impl fmt::Display for ErrorKind {
             Self::Filesystem(e) => e.fmt(f),
             Self::Network(e) => e.fmt(f),
             Self::Shim(e) => e.fmt(f),
+            Self::Version(e) => e.fmt(f),
             Self::BuildPathError => write!(
                 f,
                 "Could not create execution environment.
@@ -563,12 +536,6 @@ Please specify either 'npm' or 'github' for the format."
                 f,
                 "Unable to acquire lock on Volta directory"
             ),
-            Self::NoBundledNpm { command } => write!(
-                f,
-                "Could not detect bundled npm version.
-
-Please ensure you have a Node version selected with `volta {command} node` (see `volta help {command}` for more info)."
-            ),
             Self::NoCommandLinePnpm => write!(
                 f,
                 "No pnpm version specified.
@@ -586,12 +553,6 @@ Use `volta run --yarn` to select a version (see `volta help run` for more info).
                 "Cannot install {tool} because the default Node version is not set.
 
 Use `volta install node` to select a default Node first, then install a {tool} version."
-            ),
-            Self::NodeVersionNotFound { matching } => write!(
-                f,
-                r#"Could not find Node version matching "{matching}" in the version registry.
-
-Please verify that the version is correct."#
             ),
             Self::NoHomeEnvironmentVar => write!(
                 f,
@@ -678,12 +639,6 @@ Please ensure it is available by running `npm link` in its source directory."
                 "The package '{package}' was not installed using npm and cannot be linked with `npm link`
 
 Please ensure it is linked with `npm link` or installed with `npm i -g {package}`."
-            ),
-            Self::NpmVersionNotFound { matching } => write!(
-                f,
-                r#"Could not find npm version matching "{matching}" in the version registry.
-
-Please verify that the version is correct."#
             ),
             Self::NpxNotAvailable { version } => write!(
                 f,
@@ -787,12 +742,6 @@ Please supply a spec in the format `<tool name>[@<version>]`."
 
 {PERMISSIONS_CTA}"
             ),
-            Self::PnpmVersionNotFound { matching } => write!(
-                f,
-                r#"Could not find pnpm version matching "{matching}" in the version registry.
-
-Please verify that the version is correct."#
-            ),
             Self::PublishHookBothUrlAndBin => write!(
                 f,
                 "Publish hook configuration includes both hook types.
@@ -874,24 +823,6 @@ Please ensure it is installed with `{} {0}`",
 To upgrade it, please use the command `{command} {package}`"
                 )
             }
-            Self::VersionParseError { version } => write!(
-                f,
-                r#"Could not parse version "{version}"
-
-Please verify the intended version."#
-            ),
-            Self::Yarn2NotSupported => write!(
-                f,
-                "Yarn version 2 is not recommended for use, and not supported by Volta.
-
-Please use version 3 or greater instead."
-            ),
-            Self::YarnVersionNotFound { matching } => write!(
-                f,
-                r#"Could not find Yarn version matching "{matching}" in the version registry.
-
-Please verify that the version is correct."#
-            ),
         }
     }
 }
@@ -905,6 +836,7 @@ impl ErrorKind {
             Self::Filesystem(e) => e.exit_code(),
             Self::Network(e) => e.exit_code(),
             Self::Shim(e) => e.exit_code(),
+            Self::Version(e) => e.exit_code(),
 
             // ConfigurationError
             Self::ExtensionCycleError { .. }
@@ -913,7 +845,6 @@ impl ErrorKind {
             | Self::HookNoFieldsSpecified
             | Self::HookPathError { .. }
             | Self::InvalidRegistryFormat { .. }
-            | Self::NoBundledNpm { .. }
             | Self::NoCommandLinePnpm
             | Self::NoCommandLineYarn
             | Self::NoDefaultNodeVersion { .. }
@@ -974,14 +905,6 @@ impl ErrorKind {
             | Self::InvalidToolName { .. }
             | Self::PackageNotFound { .. }
             | Self::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
-
-            // NoVersionMatch
-            Self::NodeVersionNotFound { .. }
-            | Self::NpmVersionNotFound { .. }
-            | Self::PnpmVersionNotFound { .. }
-            | Self::VersionParseError { .. }
-            | Self::Yarn2NotSupported
-            | Self::YarnVersionNotFound { .. } => ExitCode::NoVersionMatch,
 
             // UnknownError
             Self::CouldNotDetermineTool

@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime};
 
 use super::super::registry_fetch_error;
 use super::metadata::{NodeEntry, NodeIndex, RawNodeIndex};
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError, NetworkError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, NetworkError, VersionError};
 use crate::fs::{create_staging_file, ensure_containing_dir_exists, read_file};
 use crate::hook::ToolHooks;
 use crate::layout::volta_home;
@@ -52,7 +52,7 @@ pub fn resolve(matching: VersionSpec, session: &mut Session) -> Fallible<Version
         VersionSpec::Tag(Tag::Latest) => resolve_latest(hooks),
         // Node doesn't have "tagged" versions (apart from 'latest' and 'lts'), so custom tags will always be an error
         VersionSpec::Tag(Tag::Custom(tag)) => {
-            Err(ErrorKind::NodeVersionNotFound { matching: tag }.into())
+            Err(ErrorKind::Version(VersionError::NodeNotFound { matching: tag }).into())
         }
     }
 }
@@ -75,9 +75,9 @@ fn resolve_latest(hooks: Option<&ToolHooks<Node>>) -> Fallible<Version> {
 
     version_opt.map_or_else(
         || {
-            Err(ErrorKind::NodeVersionNotFound {
+            Err(ErrorKind::Version(VersionError::NodeNotFound {
                 matching: "latest".into(),
-            }
+            })
             .into())
         },
         |version| {
@@ -102,9 +102,9 @@ fn resolve_lts(hooks: Option<&ToolHooks<Node>>) -> Fallible<Version> {
 
     version_opt.map_or_else(
         || {
-            Err(ErrorKind::NodeVersionNotFound {
+            Err(ErrorKind::Version(VersionError::NodeNotFound {
                 matching: "lts".into(),
-            }
+            })
             .into())
         },
         |version| {
@@ -131,9 +131,9 @@ fn resolve_semver(matching: &Range, hooks: Option<&ToolHooks<Node>>) -> Fallible
 
     version_opt.map_or_else(
         || {
-            Err(ErrorKind::NodeVersionNotFound {
+            Err(ErrorKind::Version(VersionError::NodeNotFound {
                 matching: matching.to_string(),
-            }
+            })
             .into())
         },
         |version| {
