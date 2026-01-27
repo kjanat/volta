@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use super::PartialPlatform;
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PackageError};
+use crate::error::{Context, Fallible, FilesystemError, PackageError};
 use crate::version::parse;
 use dunce::canonicalize;
 use nodejs_semver::Version;
@@ -41,7 +41,7 @@ impl Manifest {
                             .expect("File paths always have a parent")
                             .join(&path);
                         canonicalize(unresolved)
-                            .with_context(|| ErrorKind::ExtensionPathError { path })
+                            .with_context(|| PackageError::WorkspacePathInvalid { path })
                     })
                     .transpose()?;
                 (Some(partial), next)
@@ -85,23 +85,20 @@ pub(super) fn update_manifest(
     key: &ManifestKey,
     value: Option<&Version>,
 ) -> Fallible<()> {
-    let contents = read_to_string(file).with_context(|| {
-        ErrorKind::Package(PackageError::ProjectManifestRead {
-            file: file.to_owned(),
-        })
+    let contents = read_to_string(file).with_context(|| PackageError::ProjectManifestRead {
+        file: file.to_owned(),
     })?;
 
-    let mut manifest: serde_json::Value = serde_json::from_str(&contents).with_context(|| {
-        ErrorKind::Package(PackageError::ProjectManifestParse {
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&contents).with_context(|| PackageError::ProjectManifestParse {
             file: file.to_owned(),
-        })
-    })?;
+        })?;
 
-    let root = manifest.as_object_mut().ok_or_else(|| {
-        ErrorKind::Package(PackageError::ProjectManifestParse {
+    let root = manifest
+        .as_object_mut()
+        .ok_or_else(|| PackageError::ProjectManifestParse {
             file: file.to_owned(),
-        })
-    })?;
+        })?;
 
     let key = key.to_string();
 
@@ -121,24 +118,20 @@ pub(super) fn update_manifest(
     }
 
     let indent = detect_indent::detect_indent(&contents);
-    let mut output = File::create(file).with_context(|| {
-        ErrorKind::Filesystem(FilesystemError::WritePackage {
-            file: file.to_owned(),
-        })
+    let mut output = File::create(file).with_context(|| FilesystemError::WritePackage {
+        file: file.to_owned(),
     })?;
     let formatter = serde_json::ser::PrettyFormatter::with_indent(indent.indent().as_bytes());
     let mut ser = serde_json::Serializer::with_formatter(&output, formatter);
-    manifest.serialize(&mut ser).with_context(|| {
-        ErrorKind::Filesystem(FilesystemError::WritePackage {
+    manifest
+        .serialize(&mut ser)
+        .with_context(|| FilesystemError::WritePackage {
             file: file.to_owned(),
-        })
-    })?;
+        })?;
 
     if contents.ends_with('\n') {
-        writeln!(output).with_context(|| {
-            ErrorKind::Filesystem(FilesystemError::WritePackage {
-                file: file.to_owned(),
-            })
+        writeln!(output).with_context(|| FilesystemError::WritePackage {
+            file: file.to_owned(),
         })?;
     }
 
@@ -157,16 +150,12 @@ struct RawManifest {
 
 impl RawManifest {
     fn from_file(package: &Path) -> Fallible<Self> {
-        let file = File::open(package).with_context(|| {
-            ErrorKind::Package(PackageError::ProjectManifestRead {
-                file: package.to_owned(),
-            })
+        let file = File::open(package).with_context(|| PackageError::ProjectManifestRead {
+            file: package.to_owned(),
         })?;
 
-        serde_json::de::from_reader(file).with_context(|| {
-            ErrorKind::Package(PackageError::ProjectManifestParse {
-                file: package.to_owned(),
-            })
+        serde_json::de::from_reader(file).with_context(|| PackageError::ProjectManifestParse {
+            file: package.to_owned(),
         })
     }
 }

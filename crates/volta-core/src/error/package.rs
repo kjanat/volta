@@ -71,9 +71,19 @@ pub enum PackageError {
         package: String,
         manager: PackageManager,
     },
+
+    /// Thrown when `volta.extends` keys result in an infinite cycle.
+    WorkspaceCycle {
+        paths: Vec<PathBuf>,
+        duplicate: PathBuf,
+    },
+
+    /// Thrown when determining the path to a workspace manifest fails.
+    WorkspacePathInvalid { path: PathBuf },
 }
 
 impl fmt::Display for PackageError {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::FetchNotSupported { package } => write!(
@@ -183,6 +193,38 @@ Please ensure it is installed with `{} {0}`",
 To upgrade it, please use the command `{command} {package}`"
                 )
             }
+            Self::WorkspaceCycle { paths, duplicate } => {
+                // Detected infinite loop in project workspace:
+                //
+                // --> /home/user/workspace/project/package.json
+                //     /home/user/workspace/package.json
+                // --> /home/user/workspace/project/package.json
+                //
+                // Please ensure that project workspaces do not depend on each other.
+                f.write_str("Detected infinite loop in project workspace:\n\n")?;
+
+                for path in paths {
+                    if path == duplicate {
+                        f.write_str("--> ")?;
+                    } else {
+                        f.write_str("    ")?;
+                    }
+
+                    writeln!(f, "{}", path.display())?;
+                }
+
+                writeln!(f, "--> {}", duplicate.display())?;
+                writeln!(f)?;
+
+                f.write_str("Please ensure that project workspaces do not depend on each other.")
+            }
+            Self::WorkspacePathInvalid { path } => write!(
+                f,
+                "Could not determine path to project workspace: '{}'
+
+Please ensure that the file exists and is accessible.",
+                path.display(),
+            ),
         }
     }
 }
@@ -198,12 +240,13 @@ impl PackageError {
             | Self::LinkMissing { .. }
             | Self::LinkWrongManager { .. }
             | Self::UpgradeNotFound { .. }
-            | Self::UpgradeWrongManager { .. } => ExitCode::ConfigurationError,
+            | Self::UpgradeWrongManager { .. }
+            | Self::WorkspaceCycle { .. } => ExitCode::ConfigurationError,
 
             // FileSystemError
-            Self::ManifestRead { .. } | Self::ProjectManifestRead { .. } => {
-                ExitCode::FileSystemError
-            }
+            Self::ManifestRead { .. }
+            | Self::ProjectManifestRead { .. }
+            | Self::WorkspacePathInvalid { .. } => ExitCode::FileSystemError,
 
             // InvalidArguments
             Self::FetchNotSupported { .. }

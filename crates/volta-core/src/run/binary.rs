@@ -184,5 +184,5 @@ fn shared_module_path() -> Fallible<OsString> {
         .split()
         .prefix_entry(volta_home()?.shared_lib_root())
         .join()
-        .with_context(|| EnvironmentError::BuildPath.into())
+        .with_context(|| EnvironmentError::BuildPath)
 }

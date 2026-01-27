@@ -67,7 +67,7 @@ impl VoltaLock {
         {
             let mut state = LOCK_STATE
                 .lock()
-                .with_context(|| EnvironmentError::LockAcquire.into())?;
+                .with_context(|| EnvironmentError::LockAcquire)?;
 
             if let Some(inner) = &mut *state {
                 // Increment count and return early - lock already held
@@ -88,7 +88,7 @@ impl VoltaLock {
             .create(true)
             .truncate(true)
             .open(path)
-            .with_context(|| EnvironmentError::LockAcquire.into())?;
+            .with_context(|| EnvironmentError::LockAcquire)?;
 
         // First try to lock without blocking. If that fails, show a spinner and block.
         if file.try_lock_exclusive().is_err() {
@@ -96,7 +96,7 @@ impl VoltaLock {
             // Note: Blocks until the file can be locked
             let lock_result = file
                 .lock_exclusive()
-                .with_context(|| EnvironmentError::LockAcquire.into());
+                .with_context(|| EnvironmentError::LockAcquire);
             spinner.finish_and_clear();
             lock_result?;
         }
@@ -105,7 +105,7 @@ impl VoltaLock {
         {
             let mut state = LOCK_STATE
                 .lock()
-                .with_context(|| EnvironmentError::LockAcquire.into())?;
+                .with_context(|| EnvironmentError::LockAcquire)?;
             *state = Some(LockState { file, count: 1 });
         }
 

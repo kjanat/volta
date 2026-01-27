@@ -111,25 +111,69 @@ impl From<CommandError> for VoltaError {
     }
 }
 
+impl From<EnvironmentError> for VoltaError {
+    fn from(error: EnvironmentError) -> Self {
+        Self::from(ErrorKind::Environment(error))
+    }
+}
+
+impl From<FilesystemError> for VoltaError {
+    fn from(error: FilesystemError) -> Self {
+        Self::from(ErrorKind::Filesystem(error))
+    }
+}
+
+impl From<NetworkError> for VoltaError {
+    fn from(error: NetworkError) -> Self {
+        Self::from(ErrorKind::Network(error))
+    }
+}
+
+impl From<PackageError> for VoltaError {
+    fn from(error: PackageError) -> Self {
+        Self::from(ErrorKind::Package(error))
+    }
+}
+
+impl From<PlatformError> for VoltaError {
+    fn from(error: PlatformError) -> Self {
+        Self::from(ErrorKind::Platform(error))
+    }
+}
+
+impl From<ToolError> for VoltaError {
+    fn from(error: ToolError) -> Self {
+        Self::from(ErrorKind::Tool(error))
+    }
+}
+
+impl From<VersionError> for VoltaError {
+    fn from(error: VersionError) -> Self {
+        Self::from(ErrorKind::Version(error))
+    }
+}
+
 /// Trait providing the `with_context` method to easily convert any Result error into a `VoltaError`
 pub trait Context<T> {
     /// # Errors
     ///
     /// Returns a `VoltaError` if the underlying result is an error.
-    fn with_context<F>(self, f: F) -> Fallible<T>
+    fn with_context<F, K>(self, f: F) -> Fallible<T>
     where
-        F: FnOnce() -> ErrorKind;
+        F: FnOnce() -> K,
+        K: Into<ErrorKind>;
 }
 
 impl<T, E> Context<T> for Result<T, E>
 where
     E: Error + 'static,
 {
-    fn with_context<F>(self, f: F) -> Fallible<T>
+    fn with_context<F, K>(self, f: F) -> Fallible<T>
     where
-        F: FnOnce() -> ErrorKind,
+        F: FnOnce() -> K,
+        K: Into<ErrorKind>,
     {
-        self.map_err(|e| VoltaError::from_source(e, f()))
+        self.map_err(|e| VoltaError::from_source(e, f().into()))
     }
 }
 

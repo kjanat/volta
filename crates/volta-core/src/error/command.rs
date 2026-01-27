@@ -6,6 +6,7 @@
 //! - External command invocation
 
 use std::fmt;
+use std::path::PathBuf;
 
 use super::ExitCode;
 use crate::style::{text_width, tool_version};
@@ -39,6 +40,9 @@ pub enum CommandError {
 
     /// npx requires npm >= 5.2.0.
     NpxUnavailable { version: String },
+
+    /// Completions output file already exists.
+    CompletionsOutputExists { path: PathBuf },
 }
 
 impl fmt::Display for CommandError {
@@ -112,6 +116,13 @@ Use `volta run --yarn` to select a version (see `volta help run` for more info).
 
 This project is configured to use version {version} of npm."
             ),
+            Self::CompletionsOutputExists { path } => write!(
+                f,
+                "Completions file `{}` already exists.
+
+Please remove the file or pass `-f` or `--force` to override.",
+                path.display()
+            ),
         }
     }
 }
@@ -133,7 +144,8 @@ impl CommandError {
             // InvalidArguments
             Self::Deprecated { .. }
             | Self::InvalidToolVersion { .. }
-            | Self::InvalidBareVersion { .. } => ExitCode::InvalidArguments,
+            | Self::InvalidBareVersion { .. }
+            | Self::CompletionsOutputExists { .. } => ExitCode::InvalidArguments,
         }
     }
 }

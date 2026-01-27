@@ -13,6 +13,11 @@ use super::ExitCode;
 
 const PERMISSIONS_CTA: &str = "Please ensure you have correct permissions to the Volta directory.";
 
+const REPORT_BUG_CTA: &str =
+    "Please rerun the command that triggered this error with the environment
+variable `VOLTA_LOGLEVEL` set to `debug` and open an issue at
+https://github.com/volta-cli/volta/issues with the details!";
+
 /// Errors related to filesystem operations.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
@@ -103,6 +108,16 @@ pub enum FilesystemError {
 
     /// Could not delete a file.
     DeleteFile { file: PathBuf },
+
+    // ==================== Parse Operations ====================
+    /// Could not parse Node index cache.
+    ParseNodeIndexCache,
+
+    /// Could not parse Node index cache expiration.
+    ParseNodeIndexExpiry,
+
+    /// Could not parse npm manifest file from a Node install.
+    ParseNpmManifest,
 }
 
 impl fmt::Display for FilesystemError {
@@ -318,6 +333,26 @@ at {}
 {PERMISSIONS_CTA}",
                 file.display()
             ),
+
+            // Parse operations
+            Self::ParseNodeIndexCache => write!(
+                f,
+                "Could not parse Node index cache file.
+
+{REPORT_BUG_CTA}"
+            ),
+            Self::ParseNodeIndexExpiry => write!(
+                f,
+                "Could not parse Node index cache expiration file.
+
+{REPORT_BUG_CTA}"
+            ),
+            Self::ParseNpmManifest => write!(
+                f,
+                "Could not parse package.json file for bundled npm.
+
+Please ensure the version of Node is correct."
+            ),
         }
     }
 }
@@ -362,6 +397,11 @@ impl FilesystemError {
 
             // Delete operations - all filesystem errors
             Self::DeleteDir { .. } | Self::DeleteFile { .. } => ExitCode::FileSystemError,
+
+            // Parse operations
+            Self::ParseNodeIndexCache | Self::ParseNodeIndexExpiry | Self::ParseNpmManifest => {
+                ExitCode::UnknownError
+            }
         }
     }
 }

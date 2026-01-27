@@ -35,6 +35,9 @@ pub enum EnvironmentError {
 
     /// Thrown when unable to acquire a lock on the Volta directory.
     LockAcquire,
+
+    /// Thrown when unable to start the migration executable.
+    MigrationStartFailed,
 }
 
 impl fmt::Display for EnvironmentError {
@@ -73,6 +76,12 @@ Please create one of these and try again; or you can edit your profile manually 
                 env_profile, bin_dir.display()
             ),
             Self::LockAcquire => write!(f, "Unable to acquire lock on Volta directory"),
+            Self::MigrationStartFailed => write!(
+                f,
+                "Could not start migration process to upgrade your Volta directory.
+
+Please ensure you have 'volta-migrate' on your PATH and run it directly."
+            ),
         }
     }
 }
@@ -86,7 +95,8 @@ impl EnvironmentError {
             | Self::NoHome
             | Self::NoInstallDir
             | Self::NoLocalData
-            | Self::NoShellProfile { .. } => ExitCode::EnvironmentError,
+            | Self::NoShellProfile { .. }
+            | Self::MigrationStartFailed => ExitCode::EnvironmentError,
             Self::LockAcquire => ExitCode::FileSystemError,
         }
     }

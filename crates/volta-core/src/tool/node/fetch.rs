@@ -4,7 +4,7 @@ use std::fs::{File, read_to_string, write};
 use std::path::{Path, PathBuf};
 
 use super::NodeVersion;
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError, ToolError};
+use crate::error::{Context, Fallible, FilesystemError, ToolError};
 use crate::fs::{create_staging_dir, create_staging_file, ensure_containing_dir_exists, rename};
 use crate::hook::ToolHooks;
 use crate::layout::volta_home;
@@ -69,15 +69,15 @@ pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Node>>) -> Fallible<Nod
 
     if let Some(staging_file) = staging {
         ensure_containing_dir_exists(&cache_file).with_context(|| {
-            ErrorKind::Filesystem(FilesystemError::ContainingDir {
+            FilesystemError::ContainingDir {
                 path: cache_file.clone(),
-            })
+            }
         })?;
-        staging_file.persist(cache_file).with_context(|| {
-            ErrorKind::Tool(ToolError::PersistInventory {
+        staging_file
+            .persist(cache_file)
+            .with_context(|| ToolError::PersistInventory {
                 tool: "Node".into(),
-            })
-        })?;
+            })?;
     }
 
     Ok(node_version)
@@ -99,11 +99,9 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<Node
         .unpack(temp.path(), &mut |(), read| {
             progress.inc(read as u64);
         })
-        .with_context(|| {
-            ErrorKind::Tool(ToolError::UnpackArchive {
-                tool: "Node".into(),
-                version: version_string.clone(),
-            })
+        .with_context(|| ToolError::UnpackArchive {
+            tool: "Node".into(),
+            version: version_string.clone(),
         })?;
 
     // Save the npm version number in the npm version file for this distro
@@ -112,16 +110,15 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<Node
     save_default_npm_version(version, &npm)?;
 
     let dest = volta_home()?.node_image_dir(&version_string);
-    ensure_containing_dir_exists(&dest).with_context(|| {
-        ErrorKind::Filesystem(FilesystemError::ContainingDir { path: dest.clone() })
-    })?;
+    ensure_containing_dir_exists(&dest)
+        .with_context(|| FilesystemError::ContainingDir { path: dest.clone() })?;
 
     rename(temp.path().join(Node::archive_basename(version)), &dest).with_context(|| {
-        ErrorKind::Tool(ToolError::SetupImage {
+        ToolError::SetupImage {
             tool: "Node".into(),
             version: version_string,
             dir: dest.clone(),
-        })
+        }
     })?;
 
     progress.finish_and_clear();
@@ -190,10 +187,9 @@ struct Manifest {
 impl Manifest {
     /// Parse the version out of a package.json file
     fn version(path: &Path) -> Fallible<Version> {
-        let file = File::open(path)
-            .with_context(|| ErrorKind::Filesystem(FilesystemError::ReadNpmManifest))?;
+        let file = File::open(path).with_context(|| FilesystemError::ReadNpmManifest)?;
         let manifest: Self =
-            serde_json::de::from_reader(file).with_context(|| ErrorKind::ParseNpmManifestError)?;
+            serde_json::de::from_reader(file).with_context(|| FilesystemError::ParseNpmManifest)?;
         parse(manifest.version)
     }
 }
@@ -206,9 +202,9 @@ impl Manifest {
 pub fn load_default_npm_version(node: &Version) -> Fallible<Version> {
     let npm_version_file_path = volta_home()?.node_npm_version_file(&node.to_string());
     let npm_version = read_to_string(&npm_version_file_path).with_context(|| {
-        ErrorKind::Filesystem(FilesystemError::ReadDefaultNpm {
+        FilesystemError::ReadDefaultNpm {
             file: npm_version_file_path,
-        })
+        }
     })?;
     parse(npm_version)
 }
@@ -217,8 +213,8 @@ pub fn load_default_npm_version(node: &Version) -> Fallible<Version> {
 fn save_default_npm_version(node: &Version, npm: &Version) -> Fallible<()> {
     let npm_version_file_path = volta_home()?.node_npm_version_file(&node.to_string());
     write(&npm_version_file_path, npm.to_string().as_bytes()).with_context(|| {
-        ErrorKind::Filesystem(FilesystemError::WriteDefaultNpm {
+        FilesystemError::WriteDefaultNpm {
             file: npm_version_file_path,
-        })
+        }
     })
 }

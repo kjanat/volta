@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime};
 
 use super::super::registry_fetch_error;
 use super::metadata::{NodeEntry, NodeIndex, RawNodeIndex};
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError, NetworkError, VersionError};
+use crate::error::{Context, Fallible, FilesystemError, NetworkError, VersionError};
 use crate::fs::{create_staging_file, ensure_containing_dir_exists, read_file};
 use crate::hook::ToolHooks;
 use crate::layout::volta_home;
@@ -52,7 +52,7 @@ pub fn resolve(matching: VersionSpec, session: &mut Session) -> Fallible<Version
         VersionSpec::Tag(Tag::Latest) => resolve_latest(hooks),
         // Node doesn't have "tagged" versions (apart from 'latest' and 'lts'), so custom tags will always be an error
         VersionSpec::Tag(Tag::Custom(tag)) => {
-            Err(ErrorKind::Version(VersionError::NodeNotFound { matching: tag }).into())
+            Err(VersionError::NodeNotFound { matching: tag }.into())
         }
     }
 }
@@ -75,9 +75,9 @@ fn resolve_latest(hooks: Option<&ToolHooks<Node>>) -> Fallible<Version> {
 
     version_opt.map_or_else(
         || {
-            Err(ErrorKind::Version(VersionError::NodeNotFound {
+            Err(VersionError::NodeNotFound {
                 matching: "latest".into(),
-            })
+            }
             .into())
         },
         |version| {
@@ -102,9 +102,9 @@ fn resolve_lts(hooks: Option<&ToolHooks<Node>>) -> Fallible<Version> {
 
     version_opt.map_or_else(
         || {
-            Err(ErrorKind::Version(VersionError::NodeNotFound {
+            Err(VersionError::NodeNotFound {
                 matching: "lts".into(),
-            })
+            }
             .into())
         },
         |version| {
@@ -131,9 +131,9 @@ fn resolve_semver(matching: &Range, hooks: Option<&ToolHooks<Node>>) -> Fallible
 
     version_opt.map_or_else(
         || {
-            Err(ErrorKind::Version(VersionError::NodeNotFound {
+            Err(VersionError::NodeNotFound {
                 matching: matching.to_string(),
-            })
+            }
             .into())
         },
         |version| {
@@ -157,26 +157,22 @@ fn match_node_version(
 /// Reads a public index from the Node cache, if it exists and hasn't expired.
 fn read_cached_opt(url: &str) -> Fallible<Option<RawNodeIndex>> {
     let expiry_file = volta_home()?.node_index_expiry_file();
-    let expiry = read_file(expiry_file).with_context(|| {
-        ErrorKind::Filesystem(FilesystemError::ReadNodeIndexExpiry {
-            file: expiry_file.to_owned(),
-        })
+    let expiry = read_file(expiry_file).with_context(|| FilesystemError::ReadNodeIndexExpiry {
+        file: expiry_file.to_owned(),
     })?;
 
     if expiry
         .map(|date| httpdate::parse_http_date(&date))
         .transpose()
-        .with_context(|| ErrorKind::ParseNodeIndexExpiryError)?
+        .with_context(|| FilesystemError::ParseNodeIndexExpiry)?
         .is_none_or(|expiry_date| SystemTime::now() >= expiry_date)
     {
         return Ok(None);
     }
 
     let index_file = volta_home()?.node_index_file();
-    let cached = read_file(index_file).with_context(|| {
-        ErrorKind::Filesystem(FilesystemError::ReadNodeIndexCache {
-            file: index_file.to_owned(),
-        })
+    let cached = read_file(index_file).with_context(|| FilesystemError::ReadNodeIndexCache {
+        file: index_file.to_owned(),
     })?;
 
     let Some(json) = cached
@@ -186,7 +182,7 @@ fn read_cached_opt(url: &str) -> Fallible<Option<RawNodeIndex>> {
         return Ok(None);
     };
 
-    serde_json::de::from_str(json).with_context(|| ErrorKind::ParseNodeIndexCacheError)
+    serde_json::de::from_str(json).with_context(|| FilesystemError::ParseNodeIndexCache)
 }
 
 /// Get the cache max-age of an HTTP response.
@@ -221,9 +217,9 @@ fn resolve_node_versions(url: &str) -> Fallible<RawNodeIndex> {
             .with_context(registry_fetch_error("Node", url))?;
 
         let index: RawNodeIndex = serde_json::de::from_str(&response_text).with_context(|| {
-            ErrorKind::Network(NetworkError::ParseNodeIndex {
+            NetworkError::ParseNodeIndex {
                 from_url: url.to_string(),
-            })
+            }
         })?;
 
         let cached = create_staging_file()?;
@@ -231,43 +227,41 @@ fn resolve_node_versions(url: &str) -> Fallible<RawNodeIndex> {
         let mut cached_file: &File = cached.as_file();
         writeln!(cached_file, "{url}")
             .and_then(|()| cached_file.write(response_text.as_bytes()))
-            .with_context(|| {
-                ErrorKind::Filesystem(FilesystemError::WriteNodeIndexCache {
-                    file: cached.path().to_path_buf(),
-                })
+            .with_context(|| FilesystemError::WriteNodeIndexCache {
+                file: cached.path().to_path_buf(),
             })?;
 
         let index_cache_file = volta_home()?.node_index_file();
         ensure_containing_dir_exists(&index_cache_file).with_context(|| {
-            ErrorKind::Filesystem(FilesystemError::ContainingDir {
+            FilesystemError::ContainingDir {
                 path: index_cache_file.to_owned(),
-            })
+            }
         })?;
-        cached.persist(index_cache_file).with_context(|| {
-            ErrorKind::Filesystem(FilesystemError::WriteNodeIndexCache {
+        cached
+            .persist(index_cache_file)
+            .with_context(|| FilesystemError::WriteNodeIndexCache {
                 file: index_cache_file.to_owned(),
-            })
-        })?;
+            })?;
 
         let expiry = create_staging_file()?;
         let mut expiry_file: &File = expiry.as_file();
 
         write!(expiry_file, "{}", httpdate::fmt_http_date(expires)).with_context(|| {
-            ErrorKind::Filesystem(FilesystemError::WriteNodeIndexExpiry {
+            FilesystemError::WriteNodeIndexExpiry {
                 file: expiry.path().to_path_buf(),
-            })
+            }
         })?;
 
         let index_expiry_file = volta_home()?.node_index_expiry_file();
         ensure_containing_dir_exists(&index_expiry_file).with_context(|| {
-            ErrorKind::Filesystem(FilesystemError::ContainingDir {
+            FilesystemError::ContainingDir {
                 path: index_expiry_file.to_owned(),
-            })
+            }
         })?;
         expiry.persist(index_expiry_file).with_context(|| {
-            ErrorKind::Filesystem(FilesystemError::WriteNodeIndexExpiry {
+            FilesystemError::WriteNodeIndexExpiry {
                 file: index_expiry_file.to_owned(),
-            })
+            }
         })?;
 
         spinner.finish_and_clear();

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use nodejs_semver::Version;
 use once_cell::unsync::OnceCell;
 
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PlatformError, VoltaError};
+use crate::error::{Context, Fallible, FilesystemError, PackageError, PlatformError, VoltaError};
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
 use crate::tool::BinConfig;
@@ -73,8 +73,7 @@ pub struct Project {
 impl Project {
     /// Creates an optional Project instance from the current directory
     fn for_current_dir() -> Fallible<Option<Self>> {
-        let current_dir = env::current_dir()
-            .with_context(|| ErrorKind::Filesystem(FilesystemError::CurrentDir))?;
+        let current_dir = env::current_dir().with_context(|| FilesystemError::CurrentDir)?;
         Self::for_dir(current_dir)
     }
 
@@ -106,7 +105,7 @@ impl Project {
                 let mut paths = vec![manifest_file];
                 paths.extend(workspace_manifests);
 
-                return Err(ErrorKind::ExtensionCycleError {
+                return Err(PackageError::WorkspaceCycle {
                     paths,
                     duplicate: path,
                 }
@@ -242,7 +241,7 @@ impl Project {
 
             Ok(())
         } else {
-            Err(ErrorKind::Platform(PlatformError::NoPinnedNode { tool: "npm".into() }).into())
+            Err(PlatformError::NoPinnedNode { tool: "npm".into() }.into())
         }
     }
 
@@ -259,9 +258,9 @@ impl Project {
 
             Ok(())
         } else {
-            Err(ErrorKind::Platform(PlatformError::NoPinnedNode {
+            Err(PlatformError::NoPinnedNode {
                 tool: "pnpm".into(),
-            })
+            }
             .into())
         }
     }
@@ -279,9 +278,9 @@ impl Project {
 
             Ok(())
         } else {
-            Err(ErrorKind::Platform(PlatformError::NoPinnedNode {
+            Err(PlatformError::NoPinnedNode {
                 tool: "Yarn".into(),
-            })
+            }
             .into())
         }
     }
@@ -336,9 +335,7 @@ impl TryFrom<PartialPlatform> for PlatformSpec {
     type Error = VoltaError;
 
     fn try_from(partial: PartialPlatform) -> Fallible<Self> {
-        let node = partial
-            .node
-            .ok_or(ErrorKind::Platform(PlatformError::NoProjectNode))?;
+        let node = partial.node.ok_or(PlatformError::NoProjectNode)?;
 
         Ok(Self {
             node,

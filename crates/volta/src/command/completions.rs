@@ -5,7 +5,7 @@ use clap_complete::Shell;
 use log::info;
 
 use volta_core::{
-    error::{Context, ErrorKind, ExitCode, Fallible, FilesystemError},
+    error::{CommandError, Context, ErrorKind, ExitCode, Fallible, FilesystemError},
     session::{ActivityKind, Session},
     style::{note_prefix, success_prefix},
 };
@@ -36,7 +36,7 @@ impl Command for Completions {
         match self.out_file {
             Some(path) => {
                 if path.is_file() && !self.force {
-                    return Err(ErrorKind::CompletionsOutFileError { path }.into());
+                    return Err(CommandError::CompletionsOutputExists { path }.into());
                 }
 
                 // The user may have passed a path that does not yet exist. If
@@ -56,8 +56,9 @@ impl Command for Completions {
                     })?;
                 }
 
-                let mut file = &std::fs::File::create(&path)
-                    .with_context(|| ErrorKind::CompletionsOutFileError { path: path.clone() })?;
+                let mut file = &std::fs::File::create(&path).with_context(|| {
+                    CommandError::CompletionsOutputExists { path: path.clone() }
+                })?;
 
                 clap_complete::generate(self.shell, &mut app, app_name, &mut file);
 

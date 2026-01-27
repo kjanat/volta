@@ -1,6 +1,6 @@
 use std::process::{Command, ExitStatus};
 
-use volta_core::error::{Context, ErrorKind, VoltaError};
+use volta_core::error::{Context, EnvironmentError, VoltaError};
 use volta_core::layout::{volta_home, volta_install};
 
 pub enum Error {
@@ -16,7 +16,7 @@ pub fn ensure_layout() -> Result<(), Error> {
         Command::new(install.migrate_executable())
             .env("VOLTA_LOGLEVEL", format!("{}", log::max_level()))
             .status()
-            .with_context(|| ErrorKind::CouldNotStartMigration)
+            .with_context(|| EnvironmentError::MigrationStartFailed)
             .into_result()?;
     }
 

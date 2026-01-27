@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use super::*;
+use crate::error::{ErrorKind, PackageError};
 
 fn fixture_path(fixture_dirs: &[&str]) -> PathBuf {
     let mut cargo_manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -188,7 +189,7 @@ mod project {
         let project_error = Project::for_dir(cycle_path).unwrap_err();
 
         match project_error.kind() {
-            ErrorKind::ExtensionCycleError { paths, duplicate } => {
+            ErrorKind::Package(PackageError::WorkspaceCycle { paths, duplicate }) => {
                 let expected_paths = vec![
                     fixture_path(&["cycle-1", "package.json"]),
                     fixture_path(&["cycle-1", "volta.json"]),
@@ -204,7 +205,7 @@ mod project {
         let project_error = Project::for_dir(cycle_path).unwrap_err();
 
         match project_error.kind() {
-            ErrorKind::ExtensionCycleError { paths, duplicate } => {
+            ErrorKind::Package(PackageError::WorkspaceCycle { paths, duplicate }) => {
                 let expected_paths = vec![
                     fixture_path(&["cycle-2", "package.json"]),
                     fixture_path(&["cycle-2", "workspace-1.json"]),

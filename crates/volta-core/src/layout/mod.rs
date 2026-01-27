@@ -61,5 +61,5 @@ fn default_install_dir() -> Fallible<PathBuf> {
             path.pop(); // Remove the executable name from the path
             path
         })
-        .with_context(|| EnvironmentError::NoInstallDir.into())
+        .with_context(|| EnvironmentError::NoInstallDir)
 }
