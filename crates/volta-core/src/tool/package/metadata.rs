@@ -4,7 +4,7 @@ use std::io;
 use std::path::Path;
 
 use super::manager::PackageManager;
-use crate::error::{Context, ErrorKind, Fallible, VoltaError};
+use crate::error::{BinaryError, Context, ErrorKind, Fallible, VoltaError};
 use crate::fs::ensure_containing_dir_exists;
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
@@ -125,10 +125,13 @@ impl BinConfig {
     where
         P: AsRef<Path>,
     {
-        let config = File::open(&file).with_context(|| ErrorKind::ReadBinConfigError {
-            file: file.as_ref().to_owned(),
+        let config = File::open(&file).with_context(|| {
+            ErrorKind::Binary(BinaryError::ReadConfigError {
+                file: file.as_ref().to_owned(),
+            })
         })?;
-        serde_json::from_reader(config).with_context(|| ErrorKind::ParseBinConfigError)
+        serde_json::from_reader(config)
+            .with_context(|| ErrorKind::Binary(BinaryError::ParseConfigError))
     }
 
     /// # Errors
@@ -145,14 +148,14 @@ impl BinConfig {
                 } else {
                     Err(VoltaError::from_source(
                         error,
-                        ErrorKind::ReadBinConfigError {
+                        ErrorKind::Binary(BinaryError::ReadConfigError {
                             file: file.as_ref().to_owned(),
-                        },
+                        }),
                     ))
                 }
             }
             Ok(config) => serde_json::from_reader(config)
-                .with_context(|| ErrorKind::ParseBinConfigError)
+                .with_context(|| ErrorKind::Binary(BinaryError::ParseConfigError))
                 .map(Some),
         }
     }

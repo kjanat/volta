@@ -2,7 +2,7 @@
 //!
 //! This module contains errors related to:
 //! - Environment variable reading
-//! - Path manipulation (VOLTA_HOME, PATH)
+//! - Path manipulation (`VOLTA_HOME`, `PATH`)
 //! - Environment configuration
 
 #![allow(dead_code)]

@@ -48,7 +48,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    #[must_use] 
+    #[must_use]
     pub fn into_event(self, activity_kind: ActivityKind) -> Event {
         Event {
             timestamp: unix_timestamp(),
@@ -64,7 +64,8 @@ fn unix_timestamp() -> u64 {
     let duration = start
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
-    let nanosecs_since_epoch = duration.as_secs() * 1_000_000_000 + u64::from(duration.subsec_nanos());
+    let nanosecs_since_epoch =
+        duration.as_secs() * 1_000_000_000 + u64::from(duration.subsec_nanos());
     nanosecs_since_epoch / 1_000_000
 }
 
@@ -98,7 +99,7 @@ pub struct Log {
 
 impl Log {
     /// Constructs a new '`EventLog`'
-    #[must_use] 
+    #[must_use]
     pub const fn init() -> Self {
         Self { events: Vec::new() }
     }
@@ -161,7 +162,7 @@ impl Log {
 pub mod tests {
 
     use super::{Kind, Log};
-    use crate::error::{ErrorKind, ExitCode};
+    use crate::error::{BinaryError, ErrorKind, ExitCode};
     use crate::session::ActivityKind;
     use regex::Regex;
 
@@ -183,12 +184,9 @@ pub mod tests {
         event_log.add_event_tool_end(ActivityKind::Version, 12);
         assert_eq!(event_log.events.len(), 3);
         assert_eq!(event_log.events[2].name, "version");
-        assert_eq!(
-            event_log.events[2].event,
-            Kind::ToolEnd { exit_code: 12 }
-        );
+        assert_eq!(event_log.events[2].event, Kind::ToolEnd { exit_code: 12 });
 
-        let error = ErrorKind::BinaryExecError.into();
+        let error = ErrorKind::Binary(BinaryError::ExecError).into();
         event_log.add_event_error(ActivityKind::Install, &error);
         assert_eq!(event_log.events.len(), 4);
         assert_eq!(event_log.events[3].name, "install");

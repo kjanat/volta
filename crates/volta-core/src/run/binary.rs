@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use super::executor::{Executor, ToolCommand, ToolKind};
 use super::{debug_active_image, debug_no_platform};
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{BinaryError, Context, ErrorKind, Fallible};
 use crate::layout::volta_home;
 use crate::platform::{Platform, Sourced, System};
 use crate::session::Session;
@@ -39,9 +39,9 @@ pub(super) fn command(exe: &OsStr, args: &[OsString], session: &mut Session) -> 
                 exe_and_args.extend_from_slice(args);
                 return Ok(ToolCommand::new("yarn", exe_and_args, platform, ToolKind::Yarn).into());
             }
-            return Err(ErrorKind::ProjectLocalBinaryNotFound {
+            return Err(ErrorKind::Binary(BinaryError::ProjectLocalNotFound {
                 command: exe.to_string_lossy().to_string(),
-            }
+            })
             .into());
         }
     }
@@ -83,7 +83,7 @@ pub(super) fn local_execution_context(
 
         Ok((
             path,
-            ErrorKind::ProjectLocalBinaryExecError { command: tool },
+            ErrorKind::Binary(BinaryError::ProjectLocalExecError { command: tool }),
         ))
     } else {
         let path = System::path()?;
@@ -104,12 +104,15 @@ pub(super) fn default_execution_context(
         let path = image.path()?;
         debug_active_image(&image);
 
-        Ok((path, ErrorKind::BinaryExecError))
+        Ok((path, ErrorKind::Binary(BinaryError::ExecError)))
     } else {
         let path = System::path()?;
         debug_no_platform();
 
-        Ok((path, ErrorKind::BinaryNotFound { name: tool }))
+        Ok((
+            path,
+            ErrorKind::Binary(BinaryError::NotFound { name: tool }),
+        ))
     }
 }
 

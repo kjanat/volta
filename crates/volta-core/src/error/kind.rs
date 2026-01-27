@@ -1,6 +1,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
+use super::binary::BinaryError;
 use super::ExitCode;
 use crate::style::{text_width, tool_version};
 use crate::tool;
@@ -17,20 +18,8 @@ const PERMISSIONS_CTA: &str = "Please ensure you have correct permissions to the
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ErrorKind {
-    /// Thrown when package tries to install a binary that is already installed.
-    BinaryAlreadyInstalled {
-        bin_name: String,
-        existing_package: String,
-        new_package: String,
-    },
-
-    /// Thrown when executing an external binary fails
-    BinaryExecError,
-
-    /// Thrown when a binary could not be found in the local inventory
-    BinaryNotFound {
-        name: String,
-    },
+    /// Wrapper for binary-related errors.
+    Binary(BinaryError),
 
     /// Thrown when building the virtual environment path fails
     BuildPathError,
@@ -301,9 +290,6 @@ pub enum ErrorKind {
         file: PathBuf,
     },
 
-    /// Thrown when unable to parse a bin config file
-    ParseBinConfigError,
-
     /// Thrown when unable to parse a hooks.json file
     ParseHooksError {
         file: PathBuf,
@@ -344,31 +330,11 @@ pub enum ErrorKind {
         matching: String,
     },
 
-    /// Thrown when executing a project-local binary fails
-    ProjectLocalBinaryExecError {
-        command: String,
-    },
-
-    /// Thrown when a project-local binary could not be found
-    ProjectLocalBinaryNotFound {
-        command: String,
-    },
-
     /// Thrown when a publish hook contains both the url and bin fields
     PublishHookBothUrlAndBin,
 
     /// Thrown when a publish hook contains neither url nor bin fields
     PublishHookNeitherUrlNorBin,
-
-    /// Thrown when there was an error reading the user bin directory
-    ReadBinConfigDirError {
-        dir: PathBuf,
-    },
-
-    /// Thrown when there was an error reading the config for a binary
-    ReadBinConfigError {
-        file: PathBuf,
-    },
 
     /// Thrown when unable to read the default npm version file
     ReadDefaultNpmError {
@@ -536,28 +502,7 @@ impl fmt::Display for ErrorKind {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::BinaryAlreadyInstalled {
-                bin_name,
-                existing_package,
-                new_package,
-            } => write!(
-                f,
-                "Executable '{bin_name}' is already installed by {existing_package}
-
-Please remove {existing_package} before installing {new_package}"
-            ),
-            Self::BinaryExecError => write!(
-                f,
-                "Could not execute command.
-
-See `volta help install` and `volta help pin` for info about making tools available."
-            ),
-            Self::BinaryNotFound { name } => write!(
-                f,
-                r#"Could not find executable "{name}"
-
-Use `volta install` to add a package to your toolchain (see `volta help install` for more info)."#
-            ),
+            Self::Binary(e) => e.fmt(f),
             Self::BuildPathError => write!(
                 f,
                 "Could not create execution environment.
@@ -1024,12 +969,6 @@ to {}
 Please ensure you have correct permissions.",
                 file.display()
             ),
-            Self::ParseBinConfigError => write!(
-                f,
-                "Could not parse executable configuration file.
-
-{REPORT_BUG_CTA}"
-            ),
             Self::ParseHooksError { file } => write!(
                 f,
                 "Could not parse hooks configuration file.
@@ -1093,18 +1032,6 @@ Please supply a spec in the format `<tool name>[@<version>]`."
 
 Please verify that the version is correct."#
             ),
-            Self::ProjectLocalBinaryExecError { command } => write!(
-                f,
-                "Could not execute `{command}`
-
-Please ensure you have correct permissions to access the file."
-            ),
-            Self::ProjectLocalBinaryNotFound { command } => write!(
-                f,
-                "Could not locate executable `{command}` in your project.
-
-Please ensure that all project dependencies are installed with `npm install` or `yarn install`"
-            ),
             Self::PublishHookBothUrlAndBin => write!(
                 f,
                 "Publish hook configuration includes both hook types.
@@ -1116,24 +1043,6 @@ Please include only one of 'bin' or 'url'"
                 "Publish hook configuration includes no hook types.
 
 Please include one of 'bin' or 'url'"
-            ),
-            Self::ReadBinConfigDirError { dir } => write!(
-                f,
-                "Could not read executable metadata directory
-at {}
-
-{}",
-                dir.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::ReadBinConfigError { file } => write!(
-                f,
-                "Could not read executable configuration
-from {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
             ),
             Self::ReadDefaultNpmError { file } => write!(
                 f,
@@ -1404,9 +1313,7 @@ impl ErrorKind {
     #[must_use]
     pub const fn exit_code(&self) -> ExitCode {
         match self {
-            Self::BinaryAlreadyInstalled { .. } => ExitCode::FileSystemError,
-            Self::BinaryExecError => ExitCode::ExecutionFailure,
-            Self::BinaryNotFound { .. } => ExitCode::ExecutableNotFound,
+            Self::Binary(e) => e.exit_code(),
             Self::BuildPathError => ExitCode::EnvironmentError,
             Self::BypassError { .. } => ExitCode::ExecutionFailure,
             Self::CannotFetchPackage { .. } => ExitCode::InvalidArguments,
@@ -1469,7 +1376,6 @@ impl ErrorKind {
             Self::PackageReadError { .. } => ExitCode::FileSystemError,
             Self::PackageUnpackError => ExitCode::ConfigurationError,
             Self::PackageWriteError { .. } => ExitCode::FileSystemError,
-            Self::ParseBinConfigError => ExitCode::UnknownError,
             Self::ParseHooksError { .. } => ExitCode::ConfigurationError,
             Self::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
             Self::ParseNodeIndexCacheError => ExitCode::UnknownError,
@@ -1480,12 +1386,8 @@ impl ErrorKind {
             Self::ParsePlatformError => ExitCode::ConfigurationError,
             Self::PersistInventoryError { .. } => ExitCode::FileSystemError,
             Self::PnpmVersionNotFound { .. } => ExitCode::NoVersionMatch,
-            Self::ProjectLocalBinaryExecError { .. } => ExitCode::ExecutionFailure,
-            Self::ProjectLocalBinaryNotFound { .. } => ExitCode::FileSystemError,
             Self::PublishHookBothUrlAndBin => ExitCode::ConfigurationError,
             Self::PublishHookNeitherUrlNorBin => ExitCode::ConfigurationError,
-            Self::ReadBinConfigDirError { .. } => ExitCode::FileSystemError,
-            Self::ReadBinConfigError { .. } => ExitCode::FileSystemError,
             Self::ReadDefaultNpmError { .. } => ExitCode::FileSystemError,
             Self::ReadDirError { .. } => ExitCode::FileSystemError,
             Self::ReadHooksError { .. } => ExitCode::FileSystemError,

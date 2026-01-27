@@ -1,5 +1,5 @@
 use super::metadata::{BinConfig, PackageConfig};
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{BinaryError, Context, ErrorKind, Fallible};
 use crate::fs::{
     dir_entry_match, ok_if_not_found, read_dir_eager, remove_dir_if_exists, remove_file_if_exists,
 };
@@ -91,9 +91,9 @@ fn binaries_from_package(package: &str) -> Fallible<Vec<String>> {
         None
     })
     .or_else(ok_if_not_found)
-    .with_context(|| ErrorKind::ReadBinConfigDirError {
+    .with_context(|| ErrorKind::Binary(BinaryError::ReadConfigDirError {
         dir: bin_config_dir.to_owned(),
-    })
+    }))
 }
 
 /// Remove the link to the package in the shared lib directory

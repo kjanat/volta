@@ -17,6 +17,8 @@ mod tool;
 mod version;
 
 #[allow(clippy::module_name_repetitions)]
+pub use binary::BinaryError;
+#[allow(clippy::module_name_repetitions)]
 pub use kind::ErrorKind;
 #[allow(clippy::module_name_repetitions)]
 pub use reporter::report_error;

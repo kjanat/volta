@@ -8,7 +8,7 @@ use std::process::{Command, ExitStatus};
 
 use super::RECURSION_ENV_VAR;
 use crate::command::create_command;
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{BinaryError, Context, ErrorKind, Fallible};
 use crate::layout::volta_home;
 use crate::platform::{Overrides, Platform, System};
 use crate::session::Session;
@@ -286,7 +286,7 @@ impl PackageInstallCommand {
         let status = self
             .command
             .status()
-            .with_context(|| ErrorKind::BinaryExecError)?;
+            .with_context(|| ErrorKind::Binary(BinaryError::ExecError))?;
 
         if status.success() {
             self.installer.complete_install(&image)?;
@@ -363,7 +363,7 @@ impl PackageLinkCommand {
 
         self.command
             .status()
-            .with_context(|| ErrorKind::BinaryExecError)
+            .with_context(|| ErrorKind::Binary(BinaryError::ExecError))
     }
 
     /// Check for possible failure cases with the linked package:
@@ -478,7 +478,7 @@ impl PackageUpgradeCommand {
         let status = self
             .command
             .status()
-            .with_context(|| ErrorKind::BinaryExecError)?;
+            .with_context(|| ErrorKind::Binary(BinaryError::ExecError))?;
 
         if status.success() {
             self.upgrader.complete_upgrade(&image)?;

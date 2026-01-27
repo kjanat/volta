@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use super::executor::{Executor, ToolCommand, ToolKind};
 use super::parser::CommandArg;
 use super::{debug_active_image, debug_no_platform, RECURSION_ENV_VAR};
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{BinaryError, ErrorKind, Fallible};
 use crate::platform::{Platform, Source, System};
 use crate::session::{ActivityKind, Session};
 
@@ -52,7 +52,7 @@ pub(super) fn execution_context(
         let path = image.path()?;
         debug_active_image(&image);
 
-        Ok((path, ErrorKind::BinaryExecError))
+        Ok((path, ErrorKind::Binary(BinaryError::ExecError)))
     } else {
         let path = System::path()?;
         debug_no_platform();

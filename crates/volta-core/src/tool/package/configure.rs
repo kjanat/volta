@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use super::manager::PackageManager;
 use super::metadata::{BinConfig, PackageConfig, PackageManifest};
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{BinaryError, ErrorKind, Fallible};
 use crate::layout::volta_home;
 use crate::platform::{PlatformSpec, RuntimeImage};
 use crate::shim;
@@ -75,11 +75,11 @@ fn validate_bins(package_name: &str, manifest: &PackageManifest) -> Fallible<()>
             // The file exists, so there is a bin with this name
             // That is okay iff it came from the package that is currently being installed
             if package_name != config.package {
-                return Err(ErrorKind::BinaryAlreadyInstalled {
+                return Err(ErrorKind::Binary(BinaryError::AlreadyInstalled {
                     bin_name: bin_name.into(),
                     existing_package: config.package,
                     new_package: package_name.into(),
-                }
+                })
                 .into());
             }
         }
