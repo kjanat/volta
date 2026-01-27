@@ -4,7 +4,7 @@ use super::manager::PackageManager;
 use super::metadata::{BinConfig, PackageConfig, PackageManifest};
 use crate::error::{ErrorKind, Fallible};
 use crate::layout::volta_home;
-use crate::platform::{Image, PlatformSpec};
+use crate::platform::{PlatformSpec, RuntimeImage};
 use crate::shim;
 use crate::tool::check_shim_reachable;
 
@@ -24,7 +24,7 @@ pub(super) fn parse_manifest(
 pub(super) fn write_config_and_shims(
     name: &str,
     manifest: &PackageManifest,
-    image: &Image,
+    image: &RuntimeImage,
     manager: PackageManager,
 ) -> Fallible<()> {
     validate_bins(name, manifest)?;

@@ -7,7 +7,7 @@ use super::Tool;
 use crate::error::{Context, ErrorKind, Fallible};
 use crate::fs::{ensure_containing_dir_exists, remove_dir_if_exists, rename, symlink_dir};
 use crate::layout::volta_home;
-use crate::platform::{Image, PlatformSpec};
+use crate::platform::{PlatformSpec, RuntimeImage};
 use crate::session::Session;
 use crate::style::{success_prefix, tool_version};
 use crate::sync::VoltaLock;
@@ -51,7 +51,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the install fails.
-    pub fn run_install(&self, platform_image: &Image) -> Fallible<()> {
+    pub fn run_install(&self, platform_image: &RuntimeImage) -> Fallible<()> {
         install::run_global_install(
             self.to_string(),
             self.staging.path().to_owned(),
@@ -62,7 +62,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the install cannot be completed.
-    pub fn complete_install(self, image: &Image) -> Fallible<PackageManifest> {
+    pub fn complete_install(self, image: &RuntimeImage) -> Fallible<PackageManifest> {
         let manager = PackageManager::Npm;
         let manifest =
             configure::parse_manifest(&self.name, self.staging.path().to_owned(), manager)?;
@@ -177,7 +177,7 @@ impl DirectInstall {
     /// # Errors
     ///
     /// Returns an error if the install cannot be completed.
-    pub fn complete_install(self, image: &Image) -> Fallible<()> {
+    pub fn complete_install(self, image: &RuntimeImage) -> Fallible<()> {
         let Self {
             staging,
             name,
@@ -252,7 +252,7 @@ impl InPlaceUpgrade {
     /// # Errors
     ///
     /// Returns an error if the upgrade cannot be completed.
-    pub fn complete_upgrade(self, image: &Image) -> Fallible<()> {
+    pub fn complete_upgrade(self, image: &RuntimeImage) -> Fallible<()> {
         let manifest = configure::parse_manifest(&self.package, self.directory, self.manager)?;
 
         link_package_to_shared_dir(&self.package, self.manager)?;

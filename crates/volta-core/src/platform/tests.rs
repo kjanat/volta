@@ -56,7 +56,7 @@ fn test_image_path() {
     let v643 = Version::parse("6.4.3").unwrap();
     let v771 = Version::parse("7.7.1").unwrap();
 
-    let only_node = Image {
+    let only_node = RuntimeImage {
         node: Sourced::with_default(v123.clone()),
         npm: None,
         pnpm: None,
@@ -68,7 +68,7 @@ fn test_image_path() {
         [expected_node_bin, &path].join(path_delimiter)
     );
 
-    let node_npm = Image {
+    let node_npm = RuntimeImage {
         node: Sourced::with_default(v123.clone()),
         npm: Some(Sourced::with_default(v643.clone())),
         pnpm: None,
@@ -80,7 +80,7 @@ fn test_image_path() {
         [expected_npm_bin, expected_node_bin, &path].join(path_delimiter)
     );
 
-    let node_pnpm = Image {
+    let node_pnpm = RuntimeImage {
         node: Sourced::with_default(v123.clone()),
         npm: None,
         pnpm: Some(Sourced::with_default(v771.clone())),
@@ -92,7 +92,7 @@ fn test_image_path() {
         [expected_pnpm_bin, expected_node_bin, &path].join(path_delimiter)
     );
 
-    let node_yarn = Image {
+    let node_yarn = RuntimeImage {
         node: Sourced::with_default(v123.clone()),
         npm: None,
         pnpm: None,
@@ -104,7 +104,7 @@ fn test_image_path() {
         [expected_yarn_bin, expected_node_bin, &path].join(path_delimiter)
     );
 
-    let node_npm_pnpm = Image {
+    let node_npm_pnpm = RuntimeImage {
         node: Sourced::with_default(v123.clone()),
         npm: Some(Sourced::with_default(v643.clone())),
         pnpm: Some(Sourced::with_default(v771)),
@@ -126,7 +126,7 @@ fn test_image_path() {
         .join(path_delimiter)
     );
 
-    let node_npm_yarn = Image {
+    let node_npm_yarn = RuntimeImage {
         node: Sourced::with_default(v123),
         npm: Some(Sourced::with_default(v643)),
         pnpm: None,

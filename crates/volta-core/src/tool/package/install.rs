@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use super::manager::PackageManager;
 use crate::command::create_command;
 use crate::error::{Context, ErrorKind, Fallible};
-use crate::platform::Image;
+use crate::platform::RuntimeImage;
 use crate::style::progress_spinner;
 use log::debug;
 
@@ -15,7 +15,7 @@ use log::debug;
 pub(super) fn run_global_install(
     package: String,
     staging_dir: PathBuf,
-    platform_image: &Image,
+    platform_image: &RuntimeImage,
 ) -> Fallible<()> {
     let mut command = create_command("npm");
     command.args([

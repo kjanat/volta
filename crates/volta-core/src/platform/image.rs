@@ -8,7 +8,7 @@ use crate::tool::load_default_npm_version;
 use nodejs_semver::Version;
 
 /// A platform image.
-pub struct Image {
+pub struct RuntimeImage {
     /// The pinned version of Node.
     pub node: Sourced<Version>,
     /// The custom version of npm, if any. `None` represents using the npm that is bundled with Node
@@ -19,7 +19,7 @@ pub struct Image {
     pub yarn: Option<Sourced<Version>>,
 }
 
-impl Image {
+impl RuntimeImage {
     fn bins(&self) -> Fallible<Vec<PathBuf>> {
         let home = volta_home()?;
         let mut bins = Vec::with_capacity(3);

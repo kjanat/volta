@@ -12,7 +12,7 @@ mod system;
 #[cfg(test)]
 mod tests;
 
-pub use image::Image;
+pub use image::RuntimeImage;
 pub use system::System;
 
 /// The source with which a version is associated
@@ -275,14 +275,14 @@ impl Platform {
         }
     }
 
-    /// Check out a `Platform` into a fully-realized `Image`
+    /// Check out a `Platform` into a fully-realized `RuntimeImage`
     ///
     /// This will ensure that all necessary tools are fetched and available for execution
     ///
     /// # Errors
     ///
     /// Returns an error if any tools cannot be fetched.
-    pub fn checkout(self, session: &mut Session) -> Fallible<Image> {
+    pub fn checkout(self, session: &mut Session) -> Fallible<RuntimeImage> {
         Node::new(self.node.value.clone()).ensure_fetched(session)?;
 
         if let Some(Sourced { value: version, .. }) = &self.npm {
@@ -301,7 +301,7 @@ impl Platform {
             Yarn::new(version.clone()).ensure_fetched(session)?;
         }
 
-        Ok(Image {
+        Ok(RuntimeImage {
             node: self.node,
             npm: self.npm,
             pnpm: self.pnpm,

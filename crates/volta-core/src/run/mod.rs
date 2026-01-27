@@ -5,7 +5,7 @@ use std::path::Path;
 use std::process::ExitStatus;
 
 use crate::error::{ErrorKind, Fallible};
-use crate::platform::{Overrides, Image, Sourced};
+use crate::platform::{Overrides, RuntimeImage, Sourced};
 use crate::session::Session;
 use log::debug;
 use nodejs_semver::Version;
@@ -143,7 +143,7 @@ fn debug_no_platform() {
 
 /// Write a debug message with the full image that will be used to execute a command
 #[inline]
-fn debug_active_image(image: &Image) {
+fn debug_active_image(image: &RuntimeImage) {
     debug!(
         "Active Image:
     Node: {}
