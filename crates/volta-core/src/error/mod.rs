@@ -2,8 +2,19 @@ use std::error::Error;
 use std::fmt;
 use std::process::exit;
 
+mod binary;
+mod command;
+mod environment;
+mod filesystem;
+mod hook;
 mod kind;
+mod network;
+mod package;
+mod platform;
 mod reporter;
+mod shim;
+mod tool;
+mod version;
 
 #[allow(clippy::module_name_repetitions)]
 pub use kind::ErrorKind;
