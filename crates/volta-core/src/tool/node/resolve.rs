@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime};
 
 use super::super::registry_fetch_error;
 use super::metadata::{NodeEntry, NodeIndex, RawNodeIndex};
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, NetworkError};
 use crate::fs::{create_staging_file, ensure_containing_dir_exists, read_file};
 use crate::hook::ToolHooks;
 use crate::layout::volta_home;
@@ -14,8 +14,8 @@ use crate::session::Session;
 use crate::style::progress_spinner;
 use crate::tool::Node;
 use crate::version::{Tag, VersionSpec};
-use attohttpc::Response;
 use attohttpc::header::HeaderMap;
+use attohttpc::Response;
 use cfg_if::cfg_if;
 use headers::{CacheControl, Expires, HeaderMapExt};
 use log::debug;
@@ -221,9 +221,9 @@ fn resolve_node_versions(url: &str) -> Fallible<RawNodeIndex> {
             .with_context(registry_fetch_error("Node", url))?;
 
         let index: RawNodeIndex = serde_json::de::from_str(&response_text).with_context(|| {
-            ErrorKind::ParseNodeIndexError {
+            ErrorKind::Network(NetworkError::ParseNodeIndex {
                 from_url: url.to_string(),
-            }
+            })
         })?;
 
         let cached = create_staging_file()?;

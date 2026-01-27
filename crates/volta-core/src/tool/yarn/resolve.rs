@@ -5,7 +5,7 @@ use super::super::registry::{
 };
 use super::super::registry_fetch_error;
 use super::metadata::{RawYarnIndex, YarnIndex};
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, NetworkError};
 use crate::hook::{RegistryFormat, YarnHooks};
 use crate::session::Session;
 use crate::style::progress_spinner;
@@ -109,8 +109,10 @@ fn resolve_latest_legacy(url: &str) -> Fallible<Version> {
         .send()
         .and_then(Response::error_for_status)
         .and_then(Response::text)
-        .with_context(|| ErrorKind::YarnLatestFetchError {
-            from_url: url.to_owned(),
+        .with_context(|| {
+            ErrorKind::Network(NetworkError::YarnLatestFetch {
+                from_url: url.to_owned(),
+            })
         })?;
 
     debug!("Found yarn latest version ({response_text}) from {url}");

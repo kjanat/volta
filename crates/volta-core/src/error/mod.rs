@@ -23,6 +23,8 @@ pub use filesystem::FilesystemError;
 #[allow(clippy::module_name_repetitions)]
 pub use kind::ErrorKind;
 #[allow(clippy::module_name_repetitions)]
+pub use network::NetworkError;
+#[allow(clippy::module_name_repetitions)]
 pub use reporter::report_error;
 #[allow(clippy::module_name_repetitions)]
 pub use shim::ShimError;

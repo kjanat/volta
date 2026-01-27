@@ -1,12 +1,12 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use super::ExitCode;
 use super::binary::BinaryError;
 use super::filesystem::FilesystemError;
+use super::network::NetworkError;
 use super::shim::ShimError;
+use super::ExitCode;
 use crate::style::{text_width, tool_version};
-use crate::tool;
 use crate::tool::package::PackageManager;
 use textwrap::{fill, indent};
 
@@ -25,6 +25,9 @@ pub enum ErrorKind {
 
     /// Wrapper for filesystem-related errors.
     Filesystem(FilesystemError),
+
+    /// Wrapper for network-related errors.
+    Network(NetworkError),
 
     /// Wrapper for shim-related errors.
     Shim(ShimError),
@@ -60,11 +63,6 @@ pub enum ErrorKind {
     DeprecatedCommandError {
         command: String,
         advice: String,
-    },
-
-    DownloadToolNetworkError {
-        tool: tool::ToolSpec,
-        from_url: String,
     },
 
     /// Thrown when unable to execute a hook command
@@ -260,11 +258,6 @@ pub enum ErrorKind {
     /// Thrown when unable to parse the node index cache
     ParseNodeIndexCacheError,
 
-    /// Thrown when unable to parse the node index
-    ParseNodeIndexError {
-        from_url: String,
-    },
-
     /// Thrown when unable to parse the node index cache expiration
     ParseNodeIndexExpiryError,
 
@@ -297,12 +290,6 @@ pub enum ErrorKind {
 
     /// Thrown when a publish hook contains neither url nor bin fields
     PublishHookNeitherUrlNorBin,
-
-    /// Thrown when the public registry for Node or Yarn could not be downloaded.
-    RegistryFetchError {
-        tool: String,
-        from_url: String,
-    },
 
     /// Thrown when there was an error setting a tool to executable
     SetToolExecutable {
@@ -355,11 +342,6 @@ pub enum ErrorKind {
     /// Thrown when a user attempts to install a version of Yarn2
     Yarn2NotSupported,
 
-    /// Thrown when there is an error fetching the latest version of Yarn
-    YarnLatestFetchError {
-        from_url: String,
-    },
-
     /// Thrown when there is no Yarn version matching a requested semver specifier.
     YarnVersionNotFound {
         matching: String,
@@ -372,6 +354,7 @@ impl fmt::Display for ErrorKind {
         match self {
             Self::Binary(e) => e.fmt(f),
             Self::Filesystem(e) => e.fmt(f),
+            Self::Network(e) => e.fmt(f),
             Self::Shim(e) => e.fmt(f),
             Self::BuildPathError => write!(
                 f,
@@ -419,13 +402,6 @@ Please ensure you have 'volta-migrate' on your PATH and run it directly."
             Self::DeprecatedCommandError { command, advice } => {
                 write!(f, "The subcommand `{command}` is deprecated.\n{advice}")
             }
-            Self::DownloadToolNetworkError { tool, from_url } => write!(
-                f,
-                "Could not download {tool}
-from {from_url}
-
-Please verify your internet connection and ensure the correct version is specified."
-            ),
             Self::ExecuteHookError { command } => write!(
                 f,
                 "Could not execute hook command: '{command}'
@@ -775,13 +751,6 @@ Please ensure the file is correctly formatted.",
 
 {REPORT_BUG_CTA}"
             ),
-            Self::ParseNodeIndexError { from_url } => write!(
-                f,
-                "Could not parse Node version index
-from {from_url}
-
-Please verify your internet connection."
-            ),
             Self::ParseNodeIndexExpiryError => write!(
                 f,
                 "Could not parse Node index cache expiration file.
@@ -835,13 +804,6 @@ Please include only one of 'bin' or 'url'"
                 "Publish hook configuration includes no hook types.
 
 Please include one of 'bin' or 'url'"
-            ),
-            Self::RegistryFetchError { tool, from_url } => write!(
-                f,
-                "Could not download {tool} version registry
-from {from_url}
-
-Please verify your internet connection."
             ),
             Self::SetToolExecutable { tool } => write!(
                 f,
@@ -924,13 +886,6 @@ Please verify the intended version."#
 
 Please use version 3 or greater instead."
             ),
-            Self::YarnLatestFetchError { from_url } => write!(
-                f,
-                "Could not fetch latest version of Yarn
-from {from_url}
-
-Please verify your internet connection."
-            ),
             Self::YarnVersionNotFound { matching } => write!(
                 f,
                 r#"Could not find Yarn version matching "{matching}" in the version registry.
@@ -948,6 +903,7 @@ impl ErrorKind {
             // Delegated errors
             Self::Binary(e) => e.exit_code(),
             Self::Filesystem(e) => e.exit_code(),
+            Self::Network(e) => e.exit_code(),
             Self::Shim(e) => e.exit_code(),
 
             // ConfigurationError
@@ -1018,12 +974,6 @@ impl ErrorKind {
             | Self::InvalidToolName { .. }
             | Self::PackageNotFound { .. }
             | Self::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
-
-            // NetworkError
-            Self::DownloadToolNetworkError { .. }
-            | Self::ParseNodeIndexError { .. }
-            | Self::RegistryFetchError { .. }
-            | Self::YarnLatestFetchError { .. } => ExitCode::NetworkError,
 
             // NoVersionMatch
             Self::NodeVersionNotFound { .. }

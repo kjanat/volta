@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 use std::path::PathBuf;
 
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{ErrorKind, Fallible, NetworkError};
 use crate::layout::volta_home;
 use crate::session::Session;
 use crate::style::{note_prefix, success_prefix, tool_version};
@@ -233,7 +233,7 @@ where
 
 fn download_tool_error(tool: ToolSpec, from_url: impl AsRef<str>) -> impl FnOnce() -> ErrorKind {
     let from_url = from_url.as_ref().to_string();
-    || ErrorKind::DownloadToolNetworkError { tool, from_url }
+    || ErrorKind::Network(NetworkError::DownloadTool { tool, from_url })
 }
 
 fn registry_fetch_error(
@@ -242,7 +242,7 @@ fn registry_fetch_error(
 ) -> impl FnOnce() -> ErrorKind {
     let tool = tool.as_ref().to_string();
     let from_url = from_url.as_ref().to_string();
-    || ErrorKind::RegistryFetchError { tool, from_url }
+    || ErrorKind::Network(NetworkError::RegistryFetch { tool, from_url })
 }
 
 cfg_if!(
