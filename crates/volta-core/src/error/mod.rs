@@ -19,6 +19,8 @@ mod version;
 #[allow(clippy::module_name_repetitions)]
 pub use binary::BinaryError;
 #[allow(clippy::module_name_repetitions)]
+pub use command::CommandError;
+#[allow(clippy::module_name_repetitions)]
 pub use environment::EnvironmentError;
 #[allow(clippy::module_name_repetitions)]
 pub use filesystem::FilesystemError;
@@ -100,6 +102,12 @@ impl From<ErrorKind> for VoltaError {
         Self {
             inner: Box::new(Inner { kind, source: None }),
         }
+    }
+}
+
+impl From<CommandError> for VoltaError {
+    fn from(error: CommandError) -> Self {
+        Self::from(ErrorKind::Command(error))
     }
 }
 

@@ -8,7 +8,7 @@ use std::process::{Command, ExitStatus};
 
 use super::RECURSION_ENV_VAR;
 use crate::command::create_command;
-use crate::error::{BinaryError, Context, ErrorKind, Fallible, PackageError};
+use crate::error::{BinaryError, CommandError, Context, ErrorKind, Fallible, PackageError};
 use crate::layout::volta_home;
 use crate::platform::{Overrides, Platform, System};
 use crate::session::Session;
@@ -188,7 +188,10 @@ impl ToolCommand {
             ToolKind::ProjectLocalBinary(bin) => {
                 super::binary::local_execution_context(bin, self.platform, session)?
             }
-            ToolKind::Bypass(command) => (System::path()?, ErrorKind::BypassError { command }),
+            ToolKind::Bypass(command) => (
+                System::path()?,
+                ErrorKind::Command(CommandError::Bypass { command }),
+            ),
         };
 
         self.command.env(RECURSION_ENV_VAR, "1");

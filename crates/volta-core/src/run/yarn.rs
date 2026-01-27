@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use super::executor::{Executor, ToolCommand, ToolKind};
 use super::parser::CommandArg;
 use super::{RECURSION_ENV_VAR, debug_active_image, debug_no_platform};
-use crate::error::{BinaryError, ErrorKind, Fallible, PlatformError};
+use crate::error::{BinaryError, CommandError, ErrorKind, Fallible, PlatformError};
 use crate::platform::{Platform, Source, System};
 use crate::session::{ActivityKind, Session};
 
@@ -68,7 +68,7 @@ fn validate_platform_yarn(platform: &Platform) -> Fallible<()> {
             Source::Default | Source::Binary => {
                 Err(ErrorKind::Platform(PlatformError::NoDefaultYarn).into())
             }
-            Source::CommandLine => Err(ErrorKind::NoCommandLineYarn.into()),
+            Source::CommandLine => Err(CommandError::NoYarnSpecified.into()),
         },
     }
 }

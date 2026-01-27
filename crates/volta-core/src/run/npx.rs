@@ -3,7 +3,7 @@ use std::ffi::OsString;
 
 use super::executor::{Executor, ToolCommand, ToolKind};
 use super::{RECURSION_ENV_VAR, debug_active_image, debug_no_platform};
-use crate::error::{BinaryError, ErrorKind, Fallible, PlatformError};
+use crate::error::{BinaryError, CommandError, ErrorKind, Fallible, PlatformError};
 use crate::platform::{Platform, System};
 use crate::session::{ActivityKind, Session};
 use nodejs_semver::Version;
@@ -46,7 +46,7 @@ pub(super) fn execution_context(
         // message instead of a 'command not found' error.
         let active_npm = image.resolve_npm()?;
         if active_npm.value < *REQUIRED_NPM_VERSION {
-            return Err(ErrorKind::NpxNotAvailable {
+            return Err(CommandError::NpxUnavailable {
                 version: active_npm.value.to_string(),
             }
             .into());

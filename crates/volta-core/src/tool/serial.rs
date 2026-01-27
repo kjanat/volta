@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use super::ToolSpec;
-use crate::error::{ErrorKind, Fallible, ToolError};
+use crate::error::{CommandError, ErrorKind, Fallible, ToolError};
 use crate::version::{Tag, VersionSpec};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -108,7 +108,7 @@ impl ToolSpec {
             // - `volta install 12` is an error.
             // - `volta install lts` is an error.
             (Some(maybe_version), None, None) if is_version_like(maybe_version.as_ref()) => {
-                Err(ErrorKind::InvalidInvocationOfBareVersion {
+                Err(CommandError::InvalidBareVersion {
                     action: action.to_string(),
                     version: maybe_version.as_ref().to_string(),
                 }
@@ -126,7 +126,7 @@ impl ToolSpec {
                 if !HAS_VERSION.is_match(name.as_ref())
                     && is_version_like(maybe_version.as_ref()) =>
             {
-                Err(ErrorKind::InvalidInvocation {
+                Err(CommandError::InvalidToolVersion {
                     action: action.to_string(),
                     name: name.as_ref().to_string(),
                     version: maybe_version.as_ref().to_string(),
@@ -400,10 +400,10 @@ mod tests {
 
             assert_eq!(
                 err.kind(),
-                &ErrorKind::InvalidInvocationOfBareVersion {
+                &ErrorKind::Command(CommandError::InvalidBareVersion {
                     action: PIN.into(),
                     version: version.into()
-                },
+                }),
                 "`volta <action> number` results in the correct error"
             );
         }
@@ -418,11 +418,11 @@ mod tests {
 
             assert_eq!(
                 err.kind(),
-                &ErrorKind::InvalidInvocation {
+                &ErrorKind::Command(CommandError::InvalidToolVersion {
                     action: PIN.into(),
                     name: name.into(),
                     version: version.into()
-                },
+                }),
                 "`volta <action> tool number` results in the correct error"
             );
         }

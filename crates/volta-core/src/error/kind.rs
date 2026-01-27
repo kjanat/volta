@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use super::ExitCode;
 use super::binary::BinaryError;
+use super::command::CommandError;
 use super::environment::EnvironmentError;
 use super::filesystem::FilesystemError;
 use super::hook::HookError;
@@ -12,8 +13,6 @@ use super::platform::PlatformError;
 use super::shim::ShimError;
 use super::tool::ToolError;
 use super::version::VersionError;
-use crate::style::{text_width, tool_version};
-use textwrap::fill;
 
 const REPORT_BUG_CTA: &str =
     "Please rerun the command that triggered this error with the environment
@@ -25,6 +24,9 @@ https://github.com/volta-cli/volta/issues with the details!";
 pub enum ErrorKind {
     /// Wrapper for binary-related errors.
     Binary(BinaryError),
+
+    /// Wrapper for command-related errors.
+    Command(CommandError),
 
     /// Wrapper for environment-related errors.
     Environment(EnvironmentError),
@@ -53,23 +55,11 @@ pub enum ErrorKind {
     /// Wrapper for package-related errors.
     Package(PackageError),
 
-    /// Thrown when unable to launch a command with `VOLTA_BYPASS` set
-    BypassError {
-        command: String,
-    },
-
     /// Thrown when the Completions out-dir is not a directory
-    CompletionsOutFileError {
-        path: PathBuf,
-    },
+    CompletionsOutFileError { path: PathBuf },
 
     /// Thrown when unable to start the migration executable
     CouldNotStartMigration,
-
-    DeprecatedCommandError {
-        command: String,
-        advice: String,
-    },
 
     /// Thrown when `volta.extends` keys result in an infinite cycle
     ExtensionCycleError {
@@ -78,34 +68,7 @@ pub enum ErrorKind {
     },
 
     /// Thrown when determining the path to an extension manifest fails
-    ExtensionPathError {
-        path: PathBuf,
-    },
-
-    /// Thrown when a user does e.g. `volta install node 12` instead of
-    /// `volta install node@12`.
-    InvalidInvocation {
-        action: String,
-        name: String,
-        version: String,
-    },
-
-    /// Thrown when a user does e.g. `volta install 12` instead of
-    /// `volta install node@12`.
-    InvalidInvocationOfBareVersion {
-        action: String,
-        version: String,
-    },
-
-    /// Thrown when pnpm is not set at the command-line
-    NoCommandLinePnpm,
-
-    /// Thrown when Yarn is not set at the command-line
-    NoCommandLineYarn,
-
-    NpxNotAvailable {
-        version: String,
-    },
+    ExtensionPathError { path: PathBuf },
 
     /// Thrown when unable to parse the node index cache
     ParseNodeIndexCacheError,
@@ -117,16 +80,14 @@ pub enum ErrorKind {
     ParseNpmManifestError,
 
     /// Thrown when a given feature has not yet been implemented
-    Unimplemented {
-        feature: String,
-    },
+    Unimplemented { feature: String },
 }
 
 impl fmt::Display for ErrorKind {
-    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Binary(e) => e.fmt(f),
+            Self::Command(e) => e.fmt(f),
             Self::Environment(e) => e.fmt(f),
             Self::Filesystem(e) => e.fmt(f),
             Self::Hook(e) => e.fmt(f),
@@ -136,12 +97,6 @@ impl fmt::Display for ErrorKind {
             Self::Shim(e) => e.fmt(f),
             Self::Tool(e) => e.fmt(f),
             Self::Version(e) => e.fmt(f),
-            Self::BypassError { command } => write!(
-                f,
-                "Could not execute command '{command}'
-
-VOLTA_BYPASS is enabled, please ensure that the command exists on your system or unset VOLTA_BYPASS",
-            ),
             Self::CompletionsOutFileError { path } => write!(
                 f,
                 "Completions file `{}` already exists.
@@ -155,9 +110,6 @@ Please remove the file or pass `-f` or `--force` to override.",
 
 Please ensure you have 'volta-migrate' on your PATH and run it directly."
             ),
-            Self::DeprecatedCommandError { command, advice } => {
-                write!(f, "The subcommand `{command}` is deprecated.\n{advice}")
-            }
             Self::ExtensionCycleError { paths, duplicate } => {
                 // Detected infinite loop in project workspace:
                 //
@@ -190,73 +142,6 @@ Please ensure you have 'volta-migrate' on your PATH and run it directly."
 Please ensure that the file exists and is accessible.",
                 path.display(),
             ),
-            Self::InvalidInvocation {
-                action,
-                name,
-                version,
-            } => {
-                let error = format!(
-                    "`volta {action} {name} {version}` is not supported."
-                );
-
-                let call_to_action = format!(
-"To {action} '{name}' version '{version}', please run `volta {action} {formatted}`. \
-To {action} the packages '{name}' and '{version}', please {action} them in separate commands, or with explicit versions.",
-                    action=action,
-                    name=name,
-                    version=version,
-                    formatted=tool_version(name, version)
-                );
-
-                let wrapped_cta = match text_width() {
-                    Some(width) => fill(&call_to_action, width),
-                    None => call_to_action,
-                };
-
-                write!(f, "{error}\n\n{wrapped_cta}")
-            }
-
-            Self::InvalidInvocationOfBareVersion {
-                action,
-                version,
-            } => {
-                let error = format!(
-                    "`volta {action} {version}` is not supported."
-                );
-
-                let call_to_action = format!(
-"To {action} node version '{version}', please run `volta {action} {formatted}`. \
-To {action} the package '{version}', please use an explicit version such as '{version}@latest'.",
-                    action=action,
-                    version=version,
-                    formatted=tool_version("node", version)
-                );
-
-                let wrapped_cta = match text_width() {
-                    Some(width) => fill(&call_to_action, width),
-                    None => call_to_action,
-                };
-
-                write!(f, "{error}\n\n{wrapped_cta}")
-            }
-            Self::NoCommandLinePnpm => write!(
-                f,
-                "No pnpm version specified.
-
-Use `volta run --pnpm` to select a version (see `volta help run` for more info)."
-            ),
-            Self::NoCommandLineYarn => write!(
-                f,
-                "No Yarn version specified.
-
-Use `volta run --yarn` to select a version (see `volta help run` for more info)."
-            ),
-            Self::NpxNotAvailable { version } => write!(
-                f,
-                "'npx' is only available with npm >= 5.2.0
-
-This project is configured to use version {version} of npm."
-            ),
             Self::ParseNodeIndexCacheError => write!(
                 f,
                 "Could not parse Node index cache file.
@@ -279,6 +164,12 @@ Please ensure the version of Node is correct."
                 write!(f, "{feature} is not supported yet.")
             }
         }
+    }
+}
+
+impl From<CommandError> for ErrorKind {
+    fn from(error: CommandError) -> Self {
+        Self::Command(error)
     }
 }
 
@@ -312,6 +203,7 @@ impl ErrorKind {
         match self {
             // Delegated errors
             Self::Binary(e) => e.exit_code(),
+            Self::Command(e) => e.exit_code(),
             Self::Environment(e) => e.exit_code(),
             Self::Filesystem(e) => e.exit_code(),
             Self::Hook(e) => e.exit_code(),
@@ -323,27 +215,16 @@ impl ErrorKind {
             Self::Version(e) => e.exit_code(),
 
             // ConfigurationError
-            Self::ExtensionCycleError { .. }
-            | Self::NoCommandLinePnpm
-            | Self::NoCommandLineYarn => ExitCode::ConfigurationError,
+            Self::ExtensionCycleError { .. } => ExitCode::ConfigurationError,
 
             // EnvironmentError
             Self::CouldNotStartMigration => ExitCode::EnvironmentError,
-
-            // ExecutableNotFound
-            Self::NpxNotAvailable { .. } => ExitCode::ExecutableNotFound,
-
-            // ExecutionFailure
-            Self::BypassError { .. } => ExitCode::ExecutionFailure,
 
             // FileSystemError
             Self::ExtensionPathError { .. } => ExitCode::FileSystemError,
 
             // InvalidArguments
-            Self::CompletionsOutFileError { .. }
-            | Self::DeprecatedCommandError { .. }
-            | Self::InvalidInvocation { .. }
-            | Self::InvalidInvocationOfBareVersion { .. } => ExitCode::InvalidArguments,
+            Self::CompletionsOutFileError { .. } => ExitCode::InvalidArguments,
 
             // UnknownError
             Self::ParseNodeIndexCacheError
