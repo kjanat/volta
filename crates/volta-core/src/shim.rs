@@ -5,7 +5,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use crate::error::{Context, ErrorKind, Fallible, VoltaError};
+use crate::error::{Context, ErrorKind, Fallible, ShimError, VoltaError};
 use crate::fs::read_dir_eager;
 use crate::layout::volta_home;
 use crate::sync::VoltaLock;
@@ -79,9 +79,9 @@ pub fn delete(shim_name: &str) -> Fallible<ShimResult> {
             } else {
                 Err(VoltaError::from_source(
                     err,
-                    ErrorKind::ShimRemoveError {
+                    ErrorKind::Shim(ShimError::RemoveFailed {
                         name: shim_name.to_string(),
-                    },
+                    }),
                 ))
             }
         }
@@ -100,7 +100,7 @@ mod platform {
     use std::io;
 
     use super::ShimResult;
-    use crate::error::{ErrorKind, Fallible, VoltaError};
+    use crate::error::{ErrorKind, Fallible, ShimError, VoltaError};
     use crate::fs::symlink_file;
     use crate::layout::{volta_home, volta_install};
 
@@ -119,9 +119,9 @@ mod platform {
                 } else {
                     Err(VoltaError::from_source(
                         err,
-                        ErrorKind::ShimCreateError {
+                        ErrorKind::Shim(ShimError::CreateFailed {
                             name: shim_name.to_string(),
-                        },
+                        }),
                     ))
                 }
             }
@@ -157,7 +157,7 @@ mod platform {
     use std::fs::{write, DirEntry, Metadata};
 
     use super::ShimResult;
-    use crate::error::{Context, ErrorKind, Fallible};
+    use crate::error::{Context, ErrorKind, Fallible, ShimError};
     use crate::fs::remove_file_if_exists;
     use crate::layout::volta_home;
 
@@ -171,16 +171,18 @@ volta run "$(basename $0)" "$@""#;
     pub fn create(shim_name: &str) -> Fallible<ShimResult> {
         let shim = volta_home()?.shim_file(shim_name);
 
-        write(shim, SHIM_SCRIPT_CONTENTS).with_context(|| ErrorKind::ShimCreateError {
-            name: shim_name.to_owned(),
+        write(shim, SHIM_SCRIPT_CONTENTS).with_context(|| {
+            ErrorKind::Shim(ShimError::CreateFailed {
+                name: shim_name.to_owned(),
+            })
         })?;
 
         let git_bash_script = volta_home()?.shim_git_bash_script_file(shim_name);
 
         write(git_bash_script, GIT_BASH_SCRIPT_CONTENTS).with_context(|| {
-            ErrorKind::ShimCreateError {
+            ErrorKind::Shim(ShimError::CreateFailed {
                 name: shim_name.to_owned(),
-            }
+            })
         })?;
 
         Ok(ShimResult::Created)
@@ -200,8 +202,10 @@ volta run "$(basename $0)" "$@""#;
 
     pub fn delete_git_bash_script(shim_name: &str) -> Fallible<()> {
         let script_path = volta_home()?.shim_git_bash_script_file(shim_name);
-        remove_file_if_exists(script_path).with_context(|| ErrorKind::ShimRemoveError {
-            name: shim_name.to_string(),
+        remove_file_if_exists(script_path).with_context(|| {
+            ErrorKind::Shim(ShimError::RemoveFailed {
+                name: shim_name.to_string(),
+            })
         })
     }
 }

@@ -22,6 +22,8 @@ pub use binary::BinaryError;
 pub use kind::ErrorKind;
 #[allow(clippy::module_name_repetitions)]
 pub use reporter::report_error;
+#[allow(clippy::module_name_repetitions)]
+pub use shim::ShimError;
 
 pub type Fallible<T> = Result<T, VoltaError>;
 

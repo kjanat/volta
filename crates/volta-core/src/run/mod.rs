@@ -4,7 +4,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::process::ExitStatus;
 
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{ErrorKind, Fallible, ShimError};
 use crate::platform::{Overrides, RuntimeImage, Sourced};
 use crate::session::Session;
 use log::debug;
@@ -92,7 +92,7 @@ fn get_executor(
         .into())
     } else {
         match exe.to_str() {
-            Some("volta-shim") => Err(ErrorKind::RunShimDirectly.into()),
+            Some("volta-shim") => Err(ErrorKind::Shim(ShimError::DirectInvocation).into()),
             Some("node") => node::command(args, session, ignore_recursion),
             Some("npm") => npm::command(args, session, ignore_recursion),
             Some("npx") => npx::command(args, session, ignore_recursion),

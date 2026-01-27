@@ -2,6 +2,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use super::binary::BinaryError;
+use super::shim::ShimError;
 use super::ExitCode;
 use crate::style::{text_width, tool_version};
 use crate::tool;
@@ -20,6 +21,9 @@ const PERMISSIONS_CTA: &str = "Please ensure you have correct permissions to the
 pub enum ErrorKind {
     /// Wrapper for binary-related errors.
     Binary(BinaryError),
+
+    /// Wrapper for shim-related errors.
+    Shim(ShimError),
 
     /// Thrown when building the virtual environment path fails
     BuildPathError,
@@ -384,9 +388,6 @@ pub enum ErrorKind {
         from_url: String,
     },
 
-    /// Thrown when the shim binary is called directly, not through a symlink
-    RunShimDirectly,
-
     /// Thrown when there was an error setting a tool to executable
     SetToolExecutable {
         tool: String,
@@ -397,16 +398,6 @@ pub enum ErrorKind {
         tool: String,
         version: String,
         dir: PathBuf,
-    },
-
-    /// Thrown when Volta is unable to create a shim
-    ShimCreateError {
-        name: String,
-    },
-
-    /// Thrown when Volta is unable to remove a shim
-    ShimRemoveError {
-        name: String,
     },
 
     /// Thrown when serializing a bin config to JSON fails
@@ -503,6 +494,7 @@ impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Binary(e) => e.fmt(f),
+            Self::Shim(e) => e.fmt(f),
             Self::BuildPathError => write!(
                 f,
                 "Could not create execution environment.
@@ -1125,12 +1117,6 @@ from {from_url}
 
 Please verify your internet connection."
             ),
-            Self::RunShimDirectly => write!(
-                f,
-                "'volta-shim' should not be called directly.
-
-Please use the existing shims provided by Volta (node, yarn, etc.) to run tools."
-            ),
             Self::SetToolExecutable { tool } => write!(
                 f,
                 r#"Could not set "{tool}" to executable
@@ -1147,18 +1133,6 @@ at {}
                 version,
                 dir.display(),
                 PERMISSIONS_CTA
-            ),
-            Self::ShimCreateError { name } => write!(
-                f,
-                r#"Could not create shim for "{name}"
-
-{PERMISSIONS_CTA}"#
-            ),
-            Self::ShimRemoveError { name } => write!(
-                f,
-                r#"Could not remove shim for "{name}"
-
-{PERMISSIONS_CTA}"#
             ),
             Self::StringifyBinConfigError => write!(
                 f,
@@ -1314,6 +1288,7 @@ impl ErrorKind {
     pub const fn exit_code(&self) -> ExitCode {
         match self {
             Self::Binary(e) => e.exit_code(),
+            Self::Shim(e) => e.exit_code(),
             Self::BuildPathError => ExitCode::EnvironmentError,
             Self::BypassError { .. } => ExitCode::ExecutionFailure,
             Self::CannotFetchPackage { .. } => ExitCode::InvalidArguments,
@@ -1399,11 +1374,8 @@ impl ErrorKind {
             #[cfg(windows)]
             ErrorKind::ReadUserPathError => ExitCode::EnvironmentError,
             Self::RegistryFetchError { .. } => ExitCode::NetworkError,
-            Self::RunShimDirectly => ExitCode::InvalidArguments,
             Self::SetupToolImageError { .. } => ExitCode::FileSystemError,
             Self::SetToolExecutable { .. } => ExitCode::FileSystemError,
-            Self::ShimCreateError { .. } => ExitCode::FileSystemError,
-            Self::ShimRemoveError { .. } => ExitCode::FileSystemError,
             Self::StringifyBinConfigError => ExitCode::UnknownError,
             Self::StringifyPackageConfigError => ExitCode::UnknownError,
             Self::StringifyPlatformError => ExitCode::UnknownError,
