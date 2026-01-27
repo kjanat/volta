@@ -16,7 +16,7 @@ impl Command for Install {
         session.add_event_start(ActivityKind::Install);
 
         for tool in ToolSpec::from_strings(&self.tools, "install")? {
-            tool.resolve(session)?.install(session)?;
+            tool.resolve_installable(session)?.install(session)?;
         }
 
         session.add_event_end(ActivityKind::Install, ExitCode::Success);

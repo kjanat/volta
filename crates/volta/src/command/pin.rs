@@ -16,7 +16,7 @@ impl Command for Pin {
         session.add_event_start(ActivityKind::Pin);
 
         for tool in ToolSpec::from_strings(&self.tools, "pin")? {
-            tool.resolve(session)?.pin(session)?;
+            tool.resolve_pinnable(session)?.pin(session)?;
         }
 
         session.add_event_end(ActivityKind::Pin, ExitCode::Success);

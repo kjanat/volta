@@ -2,8 +2,8 @@ use std::fmt::{self, Display};
 
 use super::node::load_default_npm_version;
 use super::{
-    FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
-    info_installed, info_pinned, info_project_version,
+    FetchStatus, Fetchable, Installable, Pinnable, check_fetched, check_shim_reachable,
+    debug_already_fetched, info_fetched, info_installed, info_pinned, info_project_version,
 };
 use crate::error::{Context, ErrorKind, Fallible, PlatformError, VersionError};
 use crate::inventory::npm_available;
@@ -50,13 +50,16 @@ impl Npm {
     }
 }
 
-impl Tool for Npm {
+impl Fetchable for Npm {
     fn fetch(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         self.ensure_fetched(session)?;
 
         info_fetched(self);
         Ok(())
     }
+}
+
+impl Installable for Npm {
     fn install(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         // Acquire a lock on the Volta directory, if possible, to prevent concurrent changes
         let _lock = VoltaLock::acquire();
@@ -76,6 +79,9 @@ impl Tool for Npm {
         }
         Ok(())
     }
+}
+
+impl Pinnable for Npm {
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         if session.project()?.is_some() {
             self.ensure_fetched(session)?;
@@ -101,12 +107,14 @@ impl Display for Npm {
 /// The Tool implementation for setting npm to the version bundled with Node
 pub struct Bundled;
 
-impl Tool for Bundled {
+impl Fetchable for Bundled {
     fn fetch(self: Box<Self>, _session: &mut Session) -> Fallible<()> {
         info!("Bundled npm is included with Node, use `volta fetch node` to fetch Node");
         Ok(())
     }
+}
 
+impl Installable for Bundled {
     fn install(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         let toolchain = session.toolchain_mut()?;
 
@@ -137,7 +145,9 @@ impl Tool for Bundled {
 
         Ok(())
     }
+}
 
+impl Pinnable for Bundled {
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         match session.project_mut()? {
             Some(project) => {

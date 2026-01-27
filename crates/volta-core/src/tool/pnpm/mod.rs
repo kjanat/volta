@@ -8,8 +8,8 @@ use crate::style::tool_version;
 use crate::sync::VoltaLock;
 
 use super::{
-    FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
-    info_installed, info_pinned, info_project_version,
+    FetchStatus, Fetchable, Installable, Pinnable, check_fetched, check_shim_reachable,
+    debug_already_fetched, info_fetched, info_installed, info_pinned, info_project_version,
 };
 
 mod fetch;
@@ -49,14 +49,16 @@ impl Pnpm {
     }
 }
 
-impl Tool for Pnpm {
+impl Fetchable for Pnpm {
     fn fetch(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         self.ensure_fetched(session)?;
 
         info_fetched(self);
         Ok(())
     }
+}
 
+impl Installable for Pnpm {
     fn install(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         // Acquire a lock on the Volta directory, if possible, to prevent concurrent changes
         let _lock = VoltaLock::acquire();
@@ -76,7 +78,9 @@ impl Tool for Pnpm {
         }
         Ok(())
     }
+}
 
+impl Pinnable for Pnpm {
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         if session.project()?.is_some() {
             self.ensure_fetched(session)?;

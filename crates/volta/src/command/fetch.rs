@@ -1,12 +1,12 @@
 use volta_core::error::{ExitCode, Fallible};
 use volta_core::session::{ActivityKind, Session};
-use volta_core::tool;
+use volta_core::tool::ToolSpec;
 
 use crate::command::Command;
 
 #[derive(clap::Args)]
 pub struct Fetch {
-    /// Tools to fetch, like `node`, `yarn@latest` or `your-package@^14.4.3`.
+    /// Tools to fetch, like `node`, `yarn@latest` or `npm@^10`.
     #[arg(value_name = "tool[@version]", required = true)]
     tools: Vec<String>,
 }
@@ -15,8 +15,8 @@ impl Command for Fetch {
     fn run(self, session: &mut Session) -> Fallible<ExitCode> {
         session.add_event_start(ActivityKind::Fetch);
 
-        for tool in tool::ToolSpec::from_strings(&self.tools, "fetch")? {
-            tool.resolve(session)?.fetch(session)?;
+        for tool in ToolSpec::from_strings(&self.tools, "fetch")? {
+            tool.resolve_fetchable(session)?.fetch(session)?;
         }
 
         session.add_event_end(ActivityKind::Fetch, ExitCode::Success);

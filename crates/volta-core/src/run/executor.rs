@@ -522,7 +522,7 @@ impl InternalInstallCommand {
             self.tool.name()
         );
 
-        self.tool.resolve(session)?.install(session)?;
+        self.tool.resolve_installable(session)?.install(session)?;
 
         Ok(ExitStatus::from_raw(0))
     }

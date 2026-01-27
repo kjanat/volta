@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::Tool;
+use super::Installable;
 use crate::error::{
     Context, ErrorKind, Fallible, FilesystemError, PackageError, PlatformError, ToolError,
 };
@@ -77,14 +77,7 @@ impl Package {
     }
 }
 
-impl Tool for Package {
-    fn fetch(self: Box<Self>, _session: &mut Session) -> Fallible<()> {
-        Err(ErrorKind::Package(PackageError::FetchNotSupported {
-            package: self.to_string(),
-        })
-        .into())
-    }
-
+impl Installable for Package {
     fn install(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         let _lock = VoltaLock::acquire();
 
@@ -115,10 +108,6 @@ impl Tool for Package {
         }
 
         Ok(())
-    }
-
-    fn pin(self: Box<Self>, _session: &mut Session) -> Fallible<()> {
-        Err(ErrorKind::Package(PackageError::PinNotSupported { package: self.name }).into())
     }
 }
 

@@ -1,8 +1,8 @@
 use std::fmt::{self, Display};
 
 use super::{
-    FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
-    info_installed, info_pinned, info_project_version,
+    FetchStatus, Fetchable, Installable, Pinnable, check_fetched, check_shim_reachable,
+    debug_already_fetched, info_fetched, info_installed, info_pinned, info_project_version,
 };
 use crate::error::{ErrorKind, Fallible, PlatformError};
 use crate::inventory::yarn_available;
@@ -49,13 +49,16 @@ impl Yarn {
     }
 }
 
-impl Tool for Yarn {
+impl Fetchable for Yarn {
     fn fetch(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         self.ensure_fetched(session)?;
 
         info_fetched(self);
         Ok(())
     }
+}
+
+impl Installable for Yarn {
     fn install(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         // Acquire a lock on the Volta directory, if possible, to prevent concurrent changes
         let _lock = VoltaLock::acquire();
@@ -75,6 +78,9 @@ impl Tool for Yarn {
         }
         Ok(())
     }
+}
+
+impl Pinnable for Yarn {
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         if session.project()?.is_some() {
             self.ensure_fetched(session)?;

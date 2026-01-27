@@ -55,20 +55,28 @@ where
     );
 }
 
-/// Trait representing all of the actions that can be taken with a tool
-pub trait Tool: Display {
+/// Trait for tools that can be fetched into the local inventory
+pub trait Fetchable: Display {
     /// Fetch a Tool into the local inventory
     ///
     /// # Errors
     ///
     /// Returns an error if the tool cannot be fetched.
     fn fetch(self: Box<Self>, session: &mut Session) -> Fallible<()>;
+}
+
+/// Trait for tools that can be installed as the default
+pub trait Installable: Display {
     /// Install a tool, making it the default so it is available everywhere on the user's machine
     ///
     /// # Errors
     ///
     /// Returns an error if the tool cannot be installed.
     fn install(self: Box<Self>, session: &mut Session) -> Fallible<()>;
+}
+
+/// Trait for tools that can be pinned to a project
+pub trait Pinnable: Display {
     /// Pin a tool in the local project so that it is usable within the project
     ///
     /// # Errors
@@ -76,6 +84,12 @@ pub trait Tool: Display {
     /// Returns an error if the tool cannot be pinned.
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()>;
 }
+
+/// Convenience supertrait for tools that support all operations (fetch, install, pin)
+pub trait Tool: Fetchable + Installable + Pinnable {}
+
+/// Blanket implementation for any type that implements all three traits
+impl<T: Fetchable + Installable + Pinnable> Tool for T {}
 
 /// Specification for a tool and its associated version.
 #[derive(Debug)]
@@ -90,19 +104,60 @@ pub enum ToolSpec {
 }
 
 impl ToolSpec {
-    /// Resolve a tool spec into a fully realized Tool that can be fetched
+    /// Resolve a tool spec into a fetchable tool
     ///
     /// # Errors
     ///
-    /// Returns an error if the tool cannot be resolved.
-    pub fn resolve(self, session: &mut Session) -> Fallible<Box<dyn Tool>> {
+    /// Returns an error if the tool cannot be resolved or doesn't support fetching.
+    pub fn resolve_fetchable(self, session: &mut Session) -> Fallible<Box<dyn Fetchable>> {
         match self {
             Self::Node(version) => {
                 let version = node::resolve(version, session)?;
                 Ok(Box::new(Node::new(version)))
             }
             Self::Npm(version) => npm::resolve(version, session)?.map_or_else(
-                || Ok(Box::new(Bundled) as Box<dyn Tool>),
+                || Ok(Box::new(Bundled) as Box<dyn Fetchable>),
+                |version| Ok(Box::new(Npm::new(version))),
+            ),
+            Self::Pnpm(version) => {
+                if session.pnpm_enabled() {
+                    let version = pnpm::resolve(version, session)?;
+                    Ok(Box::new(Pnpm::new(version)))
+                } else {
+                    Err(
+                        ErrorKind::Package(crate::error::PackageError::FetchNotSupported {
+                            package: format!("pnpm@{version}"),
+                        })
+                        .into(),
+                    )
+                }
+            }
+            Self::Yarn(version) => {
+                let version = yarn::resolve(version, session)?;
+                Ok(Box::new(Yarn::new(version)))
+            }
+            Self::Package(name, version) => Err(ErrorKind::Package(
+                crate::error::PackageError::FetchNotSupported {
+                    package: format!("{name}@{version}"),
+                },
+            )
+            .into()),
+        }
+    }
+
+    /// Resolve a tool spec into an installable tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool cannot be resolved.
+    pub fn resolve_installable(self, session: &mut Session) -> Fallible<Box<dyn Installable>> {
+        match self {
+            Self::Node(version) => {
+                let version = node::resolve(version, session)?;
+                Ok(Box::new(Node::new(version)))
+            }
+            Self::Npm(version) => npm::resolve(version, session)?.map_or_else(
+                || Ok(Box::new(Bundled) as Box<dyn Installable>),
                 |version| Ok(Box::new(Npm::new(version))),
             ),
             Self::Pnpm(version) => {
@@ -127,6 +182,45 @@ impl ToolSpec {
                 let package = Package::new(name, version)?;
                 Ok(Box::new(package))
             }
+        }
+    }
+
+    /// Resolve a tool spec into a pinnable tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool cannot be resolved or doesn't support pinning.
+    pub fn resolve_pinnable(self, session: &mut Session) -> Fallible<Box<dyn Pinnable>> {
+        match self {
+            Self::Node(version) => {
+                let version = node::resolve(version, session)?;
+                Ok(Box::new(Node::new(version)))
+            }
+            Self::Npm(version) => npm::resolve(version, session)?.map_or_else(
+                || Ok(Box::new(Bundled) as Box<dyn Pinnable>),
+                |version| Ok(Box::new(Npm::new(version))),
+            ),
+            Self::Pnpm(version) => {
+                if session.pnpm_enabled() {
+                    let version = pnpm::resolve(version, session)?;
+                    Ok(Box::new(Pnpm::new(version)))
+                } else {
+                    Err(
+                        ErrorKind::Package(crate::error::PackageError::PinNotSupported {
+                            package: "pnpm".to_owned(),
+                        })
+                        .into(),
+                    )
+                }
+            }
+            Self::Yarn(version) => {
+                let version = yarn::resolve(version, session)?;
+                Ok(Box::new(Yarn::new(version)))
+            }
+            Self::Package(name, _) => Err(ErrorKind::Package(
+                crate::error::PackageError::PinNotSupported { package: name },
+            )
+            .into()),
         }
     }
 

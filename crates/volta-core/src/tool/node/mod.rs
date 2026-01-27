@@ -1,8 +1,8 @@
 use std::fmt::{self, Display};
 
 use super::{
-    FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
-    info_installed, info_pinned, info_project_version,
+    FetchStatus, Fetchable, Installable, Pinnable, check_fetched, check_shim_reachable,
+    debug_already_fetched, info_fetched, info_installed, info_pinned, info_project_version,
 };
 use crate::error::{ErrorKind, Fallible, PlatformError};
 use crate::inventory::node_available;
@@ -214,13 +214,16 @@ impl Node {
     }
 }
 
-impl Tool for Node {
+impl Fetchable for Node {
     fn fetch(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         let node_version = self.ensure_fetched(session)?;
 
         info_fetched(node_version);
         Ok(())
     }
+}
+
+impl Installable for Node {
     fn install(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         // Acquire a lock on the Volta directory, if possible, to prevent concurrent changes
         let _lock = VoltaLock::acquire();
@@ -255,6 +258,9 @@ impl Tool for Node {
 
         Ok(())
     }
+}
+
+impl Pinnable for Node {
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {
         if session.project()?.is_some() {
             let node_version = self.ensure_fetched(session)?;
