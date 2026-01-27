@@ -91,7 +91,7 @@ impl<T> Sourced<&T>
 where
     T: Clone,
 {
-    #[must_use] 
+    #[must_use]
     pub fn cloned(self) -> Sourced<T> {
         Sourced {
             value: self.value.clone(),
@@ -293,9 +293,10 @@ impl Platform {
         // then we won't be using the `Pnpm` tool to execute (we will be relying on the global
         // package logic), so fetching the Pnpm version would only be redundant work.
         if session.pnpm_enabled()
-            && let Some(Sourced { value: version, .. }) = &self.pnpm {
-                Pnpm::new(version.clone()).ensure_fetched(session)?;
-            }
+            && let Some(Sourced { value: version, .. }) = &self.pnpm
+        {
+            Pnpm::new(version.clone()).ensure_fetched(session)?;
+        }
 
         if let Some(Sourced { value: version, .. }) = &self.yarn {
             Yarn::new(version.clone()).ensure_fetched(session)?;

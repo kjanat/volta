@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime};
 
 use super::super::registry_fetch_error;
 use super::metadata::{NodeEntry, NodeIndex, RawNodeIndex};
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::fs::{create_staging_file, ensure_containing_dir_exists, read_file};
 use crate::hook::ToolHooks;
 use crate::layout::volta_home;
@@ -14,8 +14,8 @@ use crate::session::Session;
 use crate::style::progress_spinner;
 use crate::tool::Node;
 use crate::version::{Tag, VersionSpec};
-use attohttpc::header::HeaderMap;
 use attohttpc::Response;
+use attohttpc::header::HeaderMap;
 use cfg_if::cfg_if;
 use headers::{CacheControl, Expires, HeaderMapExt};
 use log::debug;
@@ -157,8 +157,10 @@ fn match_node_version(
 /// Reads a public index from the Node cache, if it exists and hasn't expired.
 fn read_cached_opt(url: &str) -> Fallible<Option<RawNodeIndex>> {
     let expiry_file = volta_home()?.node_index_expiry_file();
-    let expiry = read_file(expiry_file).with_context(|| ErrorKind::ReadNodeIndexExpiryError {
-        file: expiry_file.to_owned(),
+    let expiry = read_file(expiry_file).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ReadNodeIndexExpiry {
+            file: expiry_file.to_owned(),
+        })
     })?;
 
     if expiry
@@ -171,8 +173,10 @@ fn read_cached_opt(url: &str) -> Fallible<Option<RawNodeIndex>> {
     }
 
     let index_file = volta_home()?.node_index_file();
-    let cached = read_file(index_file).with_context(|| ErrorKind::ReadNodeIndexCacheError {
-        file: index_file.to_owned(),
+    let cached = read_file(index_file).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ReadNodeIndexCache {
+            file: index_file.to_owned(),
+        })
     })?;
 
     let Some(json) = cached
@@ -227,41 +231,43 @@ fn resolve_node_versions(url: &str) -> Fallible<RawNodeIndex> {
         let mut cached_file: &File = cached.as_file();
         writeln!(cached_file, "{url}")
             .and_then(|()| cached_file.write(response_text.as_bytes()))
-            .with_context(|| ErrorKind::WriteNodeIndexCacheError {
-                file: cached.path().to_path_buf(),
+            .with_context(|| {
+                ErrorKind::Filesystem(FilesystemError::WriteNodeIndexCache {
+                    file: cached.path().to_path_buf(),
+                })
             })?;
 
         let index_cache_file = volta_home()?.node_index_file();
         ensure_containing_dir_exists(&index_cache_file).with_context(|| {
-            ErrorKind::ContainingDirError {
+            ErrorKind::Filesystem(FilesystemError::ContainingDir {
                 path: index_cache_file.to_owned(),
-            }
+            })
         })?;
-        cached
-            .persist(index_cache_file)
-            .with_context(|| ErrorKind::WriteNodeIndexCacheError {
+        cached.persist(index_cache_file).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::WriteNodeIndexCache {
                 file: index_cache_file.to_owned(),
-            })?;
+            })
+        })?;
 
         let expiry = create_staging_file()?;
         let mut expiry_file: &File = expiry.as_file();
 
         write!(expiry_file, "{}", httpdate::fmt_http_date(expires)).with_context(|| {
-            ErrorKind::WriteNodeIndexExpiryError {
+            ErrorKind::Filesystem(FilesystemError::WriteNodeIndexExpiry {
                 file: expiry.path().to_path_buf(),
-            }
+            })
         })?;
 
         let index_expiry_file = volta_home()?.node_index_expiry_file();
         ensure_containing_dir_exists(&index_expiry_file).with_context(|| {
-            ErrorKind::ContainingDirError {
+            ErrorKind::Filesystem(FilesystemError::ContainingDir {
                 path: index_expiry_file.to_owned(),
-            }
+            })
         })?;
         expiry.persist(index_expiry_file).with_context(|| {
-            ErrorKind::WriteNodeIndexExpiryError {
+            ErrorKind::Filesystem(FilesystemError::WriteNodeIndexExpiry {
                 file: index_expiry_file.to_owned(),
-            }
+            })
         })?;
 
         spinner.finish_and_clear();

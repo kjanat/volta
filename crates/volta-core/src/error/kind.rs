@@ -1,9 +1,10 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use super::binary::BinaryError;
-use super::shim::ShimError;
 use super::ExitCode;
+use super::binary::BinaryError;
+use super::filesystem::FilesystemError;
+use super::shim::ShimError;
 use crate::style::{text_width, tool_version};
 use crate::tool;
 use crate::tool::package::PackageManager;
@@ -21,6 +22,9 @@ const PERMISSIONS_CTA: &str = "Please ensure you have correct permissions to the
 pub enum ErrorKind {
     /// Wrapper for binary-related errors.
     Binary(BinaryError),
+
+    /// Wrapper for filesystem-related errors.
+    Filesystem(FilesystemError),
 
     /// Wrapper for shim-related errors.
     Shim(ShimError),
@@ -48,51 +52,10 @@ pub enum ErrorKind {
         path: PathBuf,
     },
 
-    /// Thrown when the containing directory could not be determined
-    ContainingDirError {
-        path: PathBuf,
-    },
-
     CouldNotDetermineTool,
 
     /// Thrown when unable to start the migration executable
     CouldNotStartMigration,
-
-    CreateDirError {
-        dir: PathBuf,
-    },
-
-    /// Thrown when unable to create the layout file
-    CreateLayoutFileError {
-        file: PathBuf,
-    },
-
-    /// Thrown when unable to create a link to the shared global library directory
-    CreateSharedLinkError {
-        name: String,
-    },
-
-    /// Thrown when creating a temporary directory fails
-    CreateTempDirError {
-        in_dir: PathBuf,
-    },
-
-    /// Thrown when creating a temporary file fails
-    CreateTempFileError {
-        in_dir: PathBuf,
-    },
-
-    CurrentDirError,
-
-    /// Thrown when deleting a directory fails
-    DeleteDirectoryError {
-        directory: PathBuf,
-    },
-
-    /// Thrown when deleting a file fails
-    DeleteFileError {
-        file: PathBuf,
-    },
 
     DeprecatedCommandError {
         command: String,
@@ -289,11 +252,6 @@ pub enum ErrorKind {
     /// Thrown when a package has been unpacked but is not formed correctly.
     PackageUnpackError,
 
-    /// Thrown when writing a package manifest fails
-    PackageWriteError {
-        file: PathBuf,
-    },
-
     /// Thrown when unable to parse a hooks.json file
     ParseHooksError {
         file: PathBuf,
@@ -339,48 +297,6 @@ pub enum ErrorKind {
 
     /// Thrown when a publish hook contains neither url nor bin fields
     PublishHookNeitherUrlNorBin,
-
-    /// Thrown when unable to read the default npm version file
-    ReadDefaultNpmError {
-        file: PathBuf,
-    },
-
-    /// Thrown when unable to read the contents of a directory
-    ReadDirError {
-        dir: PathBuf,
-    },
-
-    /// Thrown when there was an error opening a hooks.json file
-    ReadHooksError {
-        file: PathBuf,
-    },
-
-    /// Thrown when there was an error reading the Node Index Cache
-    ReadNodeIndexCacheError {
-        file: PathBuf,
-    },
-
-    /// Thrown when there was an error reading the Node Index Cache Expiration
-    ReadNodeIndexExpiryError {
-        file: PathBuf,
-    },
-
-    /// Thrown when there was an error reading the npm manifest file
-    ReadNpmManifestError,
-
-    /// Thrown when there was an error reading a package configuration file
-    ReadPackageConfigError {
-        file: PathBuf,
-    },
-
-    /// Thrown when there was an error opening the user platform file
-    ReadPlatformError {
-        file: PathBuf,
-    },
-
-    /// Thrown when unable to read the user Path environment variable from the registry
-    #[cfg(windows)]
-    ReadUserPathError,
 
     /// Thrown when the public registry for Node or Yarn could not be downloaded.
     RegistryFetchError {
@@ -436,45 +352,6 @@ pub enum ErrorKind {
         version: String,
     },
 
-    /// Thrown when there was an error writing a bin config file
-    WriteBinConfigError {
-        file: PathBuf,
-    },
-
-    /// Thrown when there was an error writing the default npm to file
-    WriteDefaultNpmError {
-        file: PathBuf,
-    },
-
-    /// Thrown when there was an error writing the npm launcher
-    WriteLauncherError {
-        tool: String,
-    },
-
-    /// Thrown when there was an error writing the node index cache
-    WriteNodeIndexCacheError {
-        file: PathBuf,
-    },
-
-    /// Thrown when there was an error writing the node index expiration
-    WriteNodeIndexExpiryError {
-        file: PathBuf,
-    },
-
-    /// Thrown when there was an error writing a package config
-    WritePackageConfigError {
-        file: PathBuf,
-    },
-
-    /// Thrown when writing the platform.json file fails
-    WritePlatformError {
-        file: PathBuf,
-    },
-
-    /// Thrown when unable to write the user PATH environment variable
-    #[cfg(windows)]
-    WriteUserPathError,
-
     /// Thrown when a user attempts to install a version of Yarn2
     Yarn2NotSupported,
 
@@ -494,6 +371,7 @@ impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Binary(e) => e.fmt(f),
+            Self::Filesystem(e) => e.fmt(f),
             Self::Shim(e) => e.fmt(f),
             Self::BuildPathError => write!(
                 f,
@@ -526,14 +404,6 @@ Use `npm install` or `yarn add` to select a version of {package} for this projec
 Please remove the file or pass `-f` or `--force` to override.",
                 path.display()
             ),
-            Self::ContainingDirError { path } => write!(
-                f,
-                "Could not create the containing directory for {}
-
-{}",
-                path.display(),
-                PERMISSIONS_CTA
-            ),
             Self::CouldNotDetermineTool => write!(
                 f,
                 "Could not determine tool name
@@ -545,68 +415,6 @@ Please remove the file or pass `-f` or `--force` to override.",
                 "Could not start migration process to upgrade your Volta directory.
 
 Please ensure you have 'volta-migrate' on your PATH and run it directly."
-            ),
-            Self::CreateDirError { dir } => write!(
-                f,
-                "Could not create directory {}
-
-Please ensure that you have the correct permissions.",
-                dir.display()
-            ),
-            Self::CreateLayoutFileError { file } => write!(
-                f,
-                "Could not create layout file {}
-
-{}",
-                file.display(), PERMISSIONS_CTA
-            ),
-            Self::CreateSharedLinkError { name } => write!(
-                f,
-                "Could not create shared environment for package '{name}'
-
-{PERMISSIONS_CTA}"
-            ),
-            Self::CreateTempDirError { in_dir } => write!(
-                f,
-                "Could not create temporary directory
-in {}
-
-{}",
-                in_dir.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::CreateTempFileError { in_dir } => write!(
-                f,
-                "Could not create temporary file
-in {}
-
-{}",
-                in_dir.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::CurrentDirError => write!(
-                f,
-                "Could not determine current directory
-
-Please ensure that you have the correct permissions."
-            ),
-            Self::DeleteDirectoryError { directory } => write!(
-                f,
-                "Could not remove directory
-at {}
-
-{}",
-                directory.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::DeleteFileError { file } => write!(
-                f,
-                "Could not remove file
-at {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
             ),
             Self::DeprecatedCommandError { command, advice } => {
                 write!(f, "The subcommand `{command}` is deprecated.\n{advice}")
@@ -897,7 +705,7 @@ Please ensure it is linked with `npm link` or installed with `npm i -g {package}
             ),
             Self::NpmVersionNotFound { matching } => write!(
                 f,
-                r#"Could not find Node version matching "{matching}" in the version registry.
+                r#"Could not find npm version matching "{matching}" in the version registry.
 
 Please verify that the version is correct."#
             ),
@@ -952,14 +760,6 @@ Please ensure that the file exists.",
                 "Could not determine package directory layout.
 
 Please ensure the package is correctly formatted."
-            ),
-            Self::PackageWriteError { file } => write!(
-                f,
-                "Could not write project manifest
-to {}
-
-Please ensure you have correct permissions.",
-                file.display()
             ),
             Self::ParseHooksError { file } => write!(
                 f,
@@ -1035,80 +835,6 @@ Please include only one of 'bin' or 'url'"
                 "Publish hook configuration includes no hook types.
 
 Please include one of 'bin' or 'url'"
-            ),
-            Self::ReadDefaultNpmError { file } => write!(
-                f,
-                "Could not read default npm version
-from {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::ReadDirError { dir } => write!(
-                f,
-                "Could not read contents from directory {}
-
-{}",
-                dir.display(), PERMISSIONS_CTA
-            ),
-            Self::ReadHooksError { file } => write!(
-                f,
-                "Could not read hooks file
-from {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::ReadNodeIndexCacheError { file } => write!(
-                f,
-                "Could not read Node index cache
-from {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::ReadNodeIndexExpiryError { file } => write!(
-                f,
-                "Could not read Node index cache expiration
-from {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::ReadNpmManifestError => write!(
-                f,
-                "Could not read package.json file for bundled npm.
-
-Please ensure the version of Node is correct."
-            ),
-            Self::ReadPackageConfigError { file } => write!(
-                f,
-                "Could not read package configuration file
-from {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::ReadPlatformError { file } => write!(
-                f,
-                "Could not read default platform file
-from {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            #[cfg(windows)]
-            ErrorKind::ReadUserPathError => write!(
-                f,
-                "Could not read user Path environment variable.
-
-Please ensure you have access to the your environment variables."
             ),
             Self::RegistryFetchError { tool, from_url } => write!(
                 f,
@@ -1192,73 +918,6 @@ To upgrade it, please use the command `{command} {package}`"
 
 Please verify the intended version."#
             ),
-            Self::WriteBinConfigError { file } => write!(
-                f,
-                "Could not write executable configuration
-to {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::WriteDefaultNpmError { file } => write!(
-                f,
-                "Could not write bundled npm version
-to {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::WriteLauncherError { tool } => write!(
-                f,
-                "Could not set up launcher for {tool}
-
-This is most likely an intermittent failure, please try again."
-            ),
-            Self::WriteNodeIndexCacheError { file } => write!(
-                f,
-                "Could not write Node index cache
-to {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::WriteNodeIndexExpiryError { file } => write!(
-                f,
-                "Could not write Node index cache expiration
-to {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::WritePackageConfigError { file } => write!(
-                f,
-                "Could not write package configuration
-to {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            Self::WritePlatformError { file } => write!(
-                f,
-                "Could not save platform settings
-to {}
-
-{}",
-                file.display(),
-                PERMISSIONS_CTA
-            ),
-            #[cfg(windows)]
-            ErrorKind::WriteUserPathError => write!(
-                f,
-                "Could not write Path environment variable.
-
-Please ensure you have permissions to edit your environment variables."
-            ),
             Self::Yarn2NotSupported => write!(
                 f,
                 "Yarn version 2 is not recommended for use, and not supported by Volta.
@@ -1283,119 +942,110 @@ Please verify that the version is correct."#
 }
 
 impl ErrorKind {
-    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub const fn exit_code(&self) -> ExitCode {
         match self {
+            // Delegated errors
             Self::Binary(e) => e.exit_code(),
+            Self::Filesystem(e) => e.exit_code(),
             Self::Shim(e) => e.exit_code(),
-            Self::BuildPathError => ExitCode::EnvironmentError,
-            Self::BypassError { .. } => ExitCode::ExecutionFailure,
-            Self::CannotFetchPackage { .. } => ExitCode::InvalidArguments,
-            Self::CannotPinPackage { .. } => ExitCode::InvalidArguments,
-            Self::CompletionsOutFileError { .. } => ExitCode::InvalidArguments,
-            Self::ContainingDirError { .. } => ExitCode::FileSystemError,
-            Self::CouldNotDetermineTool => ExitCode::UnknownError,
-            Self::CouldNotStartMigration => ExitCode::EnvironmentError,
-            Self::CreateDirError { .. } => ExitCode::FileSystemError,
-            Self::CreateLayoutFileError { .. } => ExitCode::FileSystemError,
-            Self::CreateSharedLinkError { .. } => ExitCode::FileSystemError,
-            Self::CreateTempDirError { .. } => ExitCode::FileSystemError,
-            Self::CreateTempFileError { .. } => ExitCode::FileSystemError,
-            Self::CurrentDirError => ExitCode::EnvironmentError,
-            Self::DeleteDirectoryError { .. } => ExitCode::FileSystemError,
-            Self::DeleteFileError { .. } => ExitCode::FileSystemError,
-            Self::DeprecatedCommandError { .. } => ExitCode::InvalidArguments,
-            Self::DownloadToolNetworkError { .. } => ExitCode::NetworkError,
-            Self::ExecuteHookError { .. } => ExitCode::ExecutionFailure,
-            Self::ExtensionCycleError { .. } => ExitCode::ConfigurationError,
-            Self::ExtensionPathError { .. } => ExitCode::FileSystemError,
-            Self::HookCommandFailed { .. } => ExitCode::ConfigurationError,
-            Self::HookMultipleFieldsSpecified => ExitCode::ConfigurationError,
-            Self::HookNoFieldsSpecified => ExitCode::ConfigurationError,
-            Self::HookPathError { .. } => ExitCode::ConfigurationError,
-            Self::InstalledPackageNameError => ExitCode::UnknownError,
-            Self::InvalidHookCommand { .. } => ExitCode::ExecutableNotFound,
-            Self::InvalidHookOutput { .. } => ExitCode::ExecutionFailure,
-            Self::InvalidInvocation { .. } => ExitCode::InvalidArguments,
-            Self::InvalidInvocationOfBareVersion { .. } => ExitCode::InvalidArguments,
-            Self::InvalidRegistryFormat { .. } => ExitCode::ConfigurationError,
-            Self::InvalidToolName { .. } => ExitCode::InvalidArguments,
-            Self::LockAcquireError => ExitCode::FileSystemError,
-            Self::NoBundledNpm { .. } => ExitCode::ConfigurationError,
-            Self::NoCommandLinePnpm => ExitCode::ConfigurationError,
-            Self::NoCommandLineYarn => ExitCode::ConfigurationError,
-            Self::NoDefaultNodeVersion { .. } => ExitCode::ConfigurationError,
-            Self::NodeVersionNotFound { .. } => ExitCode::NoVersionMatch,
-            Self::NoHomeEnvironmentVar => ExitCode::EnvironmentError,
-            Self::NoInstallDir => ExitCode::EnvironmentError,
-            Self::NoLocalDataDir => ExitCode::EnvironmentError,
-            Self::NoPinnedNodeVersion { .. } => ExitCode::ConfigurationError,
-            Self::NoPlatform => ExitCode::ConfigurationError,
-            Self::NoProjectNodeInManifest => ExitCode::ConfigurationError,
-            Self::NoProjectPnpm => ExitCode::ConfigurationError,
-            Self::NoProjectYarn => ExitCode::ConfigurationError,
-            Self::NoShellProfile { .. } => ExitCode::EnvironmentError,
-            Self::NotInPackage => ExitCode::ConfigurationError,
-            Self::NoDefaultPnpm => ExitCode::ConfigurationError,
-            Self::NoDefaultYarn => ExitCode::ConfigurationError,
-            Self::NpmLinkMissingPackage { .. } => ExitCode::ConfigurationError,
-            Self::NpmLinkWrongManager { .. } => ExitCode::ConfigurationError,
-            Self::NpmVersionNotFound { .. } => ExitCode::NoVersionMatch,
-            Self::NpxNotAvailable { .. } => ExitCode::ExecutableNotFound,
-            Self::PackageInstallFailed { .. } => ExitCode::UnknownError,
-            Self::PackageManifestParseError { .. } => ExitCode::ConfigurationError,
-            Self::PackageManifestReadError { .. } => ExitCode::FileSystemError,
-            Self::PackageNotFound { .. } => ExitCode::InvalidArguments,
-            Self::PackageParseError { .. } => ExitCode::ConfigurationError,
-            Self::PackageReadError { .. } => ExitCode::FileSystemError,
-            Self::PackageUnpackError => ExitCode::ConfigurationError,
-            Self::PackageWriteError { .. } => ExitCode::FileSystemError,
-            Self::ParseHooksError { .. } => ExitCode::ConfigurationError,
-            Self::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
-            Self::ParseNodeIndexCacheError => ExitCode::UnknownError,
-            Self::ParseNodeIndexError { .. } => ExitCode::NetworkError,
-            Self::ParseNodeIndexExpiryError => ExitCode::UnknownError,
-            Self::ParseNpmManifestError => ExitCode::UnknownError,
-            Self::ParsePackageConfigError => ExitCode::UnknownError,
-            Self::ParsePlatformError => ExitCode::ConfigurationError,
-            Self::PersistInventoryError { .. } => ExitCode::FileSystemError,
-            Self::PnpmVersionNotFound { .. } => ExitCode::NoVersionMatch,
-            Self::PublishHookBothUrlAndBin => ExitCode::ConfigurationError,
-            Self::PublishHookNeitherUrlNorBin => ExitCode::ConfigurationError,
-            Self::ReadDefaultNpmError { .. } => ExitCode::FileSystemError,
-            Self::ReadDirError { .. } => ExitCode::FileSystemError,
-            Self::ReadHooksError { .. } => ExitCode::FileSystemError,
-            Self::ReadNodeIndexCacheError { .. } => ExitCode::FileSystemError,
-            Self::ReadNodeIndexExpiryError { .. } => ExitCode::FileSystemError,
-            Self::ReadNpmManifestError => ExitCode::UnknownError,
-            Self::ReadPackageConfigError { .. } => ExitCode::FileSystemError,
-            Self::ReadPlatformError { .. } => ExitCode::FileSystemError,
-            #[cfg(windows)]
-            ErrorKind::ReadUserPathError => ExitCode::EnvironmentError,
-            Self::RegistryFetchError { .. } => ExitCode::NetworkError,
-            Self::SetupToolImageError { .. } => ExitCode::FileSystemError,
-            Self::SetToolExecutable { .. } => ExitCode::FileSystemError,
-            Self::StringifyBinConfigError => ExitCode::UnknownError,
-            Self::StringifyPackageConfigError => ExitCode::UnknownError,
-            Self::StringifyPlatformError => ExitCode::UnknownError,
-            Self::Unimplemented { .. } => ExitCode::UnknownError,
-            Self::UnpackArchiveError { .. } => ExitCode::UnknownError,
-            Self::UpgradePackageNotFound { .. } => ExitCode::ConfigurationError,
-            Self::UpgradePackageWrongManager { .. } => ExitCode::ConfigurationError,
-            Self::VersionParseError { .. } => ExitCode::NoVersionMatch,
-            Self::WriteBinConfigError { .. } => ExitCode::FileSystemError,
-            Self::WriteDefaultNpmError { .. } => ExitCode::FileSystemError,
-            Self::WriteLauncherError { .. } => ExitCode::FileSystemError,
-            Self::WriteNodeIndexCacheError { .. } => ExitCode::FileSystemError,
-            Self::WriteNodeIndexExpiryError { .. } => ExitCode::FileSystemError,
-            Self::WritePackageConfigError { .. } => ExitCode::FileSystemError,
-            Self::WritePlatformError { .. } => ExitCode::FileSystemError,
-            #[cfg(windows)]
-            ErrorKind::WriteUserPathError => ExitCode::EnvironmentError,
-            Self::Yarn2NotSupported => ExitCode::NoVersionMatch,
-            Self::YarnLatestFetchError { .. } => ExitCode::NetworkError,
-            Self::YarnVersionNotFound { .. } => ExitCode::NoVersionMatch,
+
+            // ConfigurationError
+            Self::ExtensionCycleError { .. }
+            | Self::HookCommandFailed { .. }
+            | Self::HookMultipleFieldsSpecified
+            | Self::HookNoFieldsSpecified
+            | Self::HookPathError { .. }
+            | Self::InvalidRegistryFormat { .. }
+            | Self::NoBundledNpm { .. }
+            | Self::NoCommandLinePnpm
+            | Self::NoCommandLineYarn
+            | Self::NoDefaultNodeVersion { .. }
+            | Self::NoDefaultPnpm
+            | Self::NoDefaultYarn
+            | Self::NoPinnedNodeVersion { .. }
+            | Self::NoPlatform
+            | Self::NoProjectNodeInManifest
+            | Self::NoProjectPnpm
+            | Self::NoProjectYarn
+            | Self::NotInPackage
+            | Self::NpmLinkMissingPackage { .. }
+            | Self::NpmLinkWrongManager { .. }
+            | Self::PackageManifestParseError { .. }
+            | Self::PackageParseError { .. }
+            | Self::PackageUnpackError
+            | Self::ParseHooksError { .. }
+            | Self::ParsePlatformError
+            | Self::PublishHookBothUrlAndBin
+            | Self::PublishHookNeitherUrlNorBin
+            | Self::UpgradePackageNotFound { .. }
+            | Self::UpgradePackageWrongManager { .. } => ExitCode::ConfigurationError,
+
+            // EnvironmentError
+            Self::BuildPathError
+            | Self::CouldNotStartMigration
+            | Self::NoHomeEnvironmentVar
+            | Self::NoInstallDir
+            | Self::NoLocalDataDir
+            | Self::NoShellProfile { .. } => ExitCode::EnvironmentError,
+
+            // ExecutableNotFound
+            Self::InvalidHookCommand { .. } | Self::NpxNotAvailable { .. } => {
+                ExitCode::ExecutableNotFound
+            }
+
+            // ExecutionFailure
+            Self::BypassError { .. }
+            | Self::ExecuteHookError { .. }
+            | Self::InvalidHookOutput { .. } => ExitCode::ExecutionFailure,
+
+            // FileSystemError
+            Self::ExtensionPathError { .. }
+            | Self::LockAcquireError
+            | Self::PackageManifestReadError { .. }
+            | Self::PackageReadError { .. }
+            | Self::PersistInventoryError { .. }
+            | Self::SetupToolImageError { .. }
+            | Self::SetToolExecutable { .. } => ExitCode::FileSystemError,
+
+            // InvalidArguments
+            Self::CannotFetchPackage { .. }
+            | Self::CannotPinPackage { .. }
+            | Self::CompletionsOutFileError { .. }
+            | Self::DeprecatedCommandError { .. }
+            | Self::InvalidInvocation { .. }
+            | Self::InvalidInvocationOfBareVersion { .. }
+            | Self::InvalidToolName { .. }
+            | Self::PackageNotFound { .. }
+            | Self::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
+
+            // NetworkError
+            Self::DownloadToolNetworkError { .. }
+            | Self::ParseNodeIndexError { .. }
+            | Self::RegistryFetchError { .. }
+            | Self::YarnLatestFetchError { .. } => ExitCode::NetworkError,
+
+            // NoVersionMatch
+            Self::NodeVersionNotFound { .. }
+            | Self::NpmVersionNotFound { .. }
+            | Self::PnpmVersionNotFound { .. }
+            | Self::VersionParseError { .. }
+            | Self::Yarn2NotSupported
+            | Self::YarnVersionNotFound { .. } => ExitCode::NoVersionMatch,
+
+            // UnknownError
+            Self::CouldNotDetermineTool
+            | Self::InstalledPackageNameError
+            | Self::PackageInstallFailed { .. }
+            | Self::ParseNodeIndexCacheError
+            | Self::ParseNodeIndexExpiryError
+            | Self::ParseNpmManifestError
+            | Self::ParsePackageConfigError
+            | Self::StringifyBinConfigError
+            | Self::StringifyPackageConfigError
+            | Self::StringifyPlatformError
+            | Self::Unimplemented { .. }
+            | Self::UnpackArchiveError { .. } => ExitCode::UnknownError,
         }
     }
 }

@@ -99,9 +99,10 @@ mod os {
 
         // PROFILE environment variable, if set
         if let Ok(profile_env) = env::var("PROFILE")
-            && !profile_env.is_empty() {
-                profiles.push(profile_env.into());
-            }
+            && !profile_env.is_empty()
+        {
+            profiles.push(profile_env.into());
+        }
 
         add_zsh_profile(&home_dir, &shell, &mut profiles);
         add_bash_profiles(&home_dir, &shell, &mut profiles);
@@ -190,11 +191,12 @@ If you run into problems running Volta, create {suggested_bash_profile} and run 
 
     fn format_home(volta_home: &Path) -> String {
         if let Some(home_dir) = env::var_os("HOME")
-            && let Ok(suffix) = volta_home.strip_prefix(home_dir) {
-                // If the HOME environment variable is set _and_ the proposed VOLTA_HOME starts
-                // with that value, use $HOME when writing the profile scripts
-                return format!("$HOME/{}", suffix.display());
-            }
+            && let Ok(suffix) = volta_home.strip_prefix(home_dir)
+        {
+            // If the HOME environment variable is set _and_ the proposed VOLTA_HOME starts
+            // with that value, use $HOME when writing the profile scripts
+            return format!("$HOME/{}", suffix.display());
+        }
 
         volta_home.display().to_string()
     }
@@ -221,20 +223,20 @@ mod os {
     use std::process::Command;
 
     use log::debug;
-    use volta_core::error::{Context, ErrorKind, Fallible};
+    use volta_core::error::{Context, ErrorKind, Fallible, FilesystemError};
     use volta_core::layout::volta_home;
-    use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
 
     pub fn setup_environment() -> Fallible<()> {
         let shim_dir = volta_home()?.shim_dir().to_string_lossy().to_string();
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let env = hkcu
             .open_subkey("Environment")
-            .with_context(|| ErrorKind::ReadUserPathError)?;
+            .with_context(|| ErrorKind::Filesystem(FilesystemError::ReadUserPath))?;
         let path: String = env
             .get_value("Path")
-            .with_context(|| ErrorKind::ReadUserPathError)?;
+            .with_context(|| ErrorKind::Filesystem(FilesystemError::ReadUserPath))?;
 
         if !path.contains(&shim_dir) {
             // Use `setx` command to edit the user Path environment variable
@@ -245,12 +247,12 @@ mod os {
             debug!("Modifying User Path with command: {:?}", command);
             let output = command
                 .output()
-                .with_context(|| ErrorKind::WriteUserPathError)?;
+                .with_context(|| ErrorKind::Filesystem(FilesystemError::WriteUserPath))?;
 
             if !output.status.success() {
                 debug!("[setx stderr]\n{}", String::from_utf8_lossy(&output.stderr));
                 debug!("[setx stdout]\n{}", String::from_utf8_lossy(&output.stdout));
-                return Err(ErrorKind::WriteUserPathError.into());
+                return Err(ErrorKind::Filesystem(FilesystemError::WriteUserPath).into());
             }
         }
 

@@ -3,7 +3,7 @@ use std::ffi::OsString;
 
 use which::which_in;
 
-use volta_core::error::{Context, ErrorKind, ExitCode, Fallible};
+use volta_core::error::{Context, ErrorKind, ExitCode, Fallible, FilesystemError};
 use volta_core::platform::{Platform, System};
 use volta_core::run::binary::DefaultBinary;
 use volta_core::session::{ActivityKind, Session};
@@ -55,7 +55,8 @@ impl Command for Which {
             None => System::path()?,
         };
 
-        let cwd = env::current_dir().with_context(|| ErrorKind::CurrentDirError)?;
+        let cwd = env::current_dir()
+            .with_context(|| ErrorKind::Filesystem(FilesystemError::CurrentDir))?;
         let exit_code = which_in(&self.binary, Some(path), cwd).map_or_else(
             |_| {
                 // `which_in` Will return an Err if it can't find the binary in the path

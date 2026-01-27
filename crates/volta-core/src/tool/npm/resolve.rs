@@ -1,13 +1,13 @@
 //! Provides resolution of npm Version requirements into specific versions
 
 use super::super::registry::{
-    fetch_npm_registry, public_registry_index, PackageDetails, PackageIndex,
+    PackageDetails, PackageIndex, fetch_npm_registry, public_registry_index,
 };
 use crate::error::{ErrorKind, Fallible};
 use crate::hook::ToolHooks;
 use crate::session::Session;
 use crate::tool::Npm;
-use crate::version::{VersionSpec, Tag};
+use crate::version::{Tag, VersionSpec};
 use log::debug;
 use nodejs_semver::{Range, Version};
 
@@ -19,9 +19,7 @@ pub fn resolve(matching: VersionSpec, session: &mut Session) -> Fallible<Option<
     match matching {
         VersionSpec::Semver(requirement) => resolve_semver(&requirement, hooks).map(Some),
         VersionSpec::Exact(version) => Ok(Some(version)),
-        VersionSpec::None | VersionSpec::Tag(Tag::Latest) => {
-            resolve_tag("latest", hooks).map(Some)
-        }
+        VersionSpec::None | VersionSpec::Tag(Tag::Latest) => resolve_tag("latest", hooks).map(Some),
         VersionSpec::Tag(Tag::Custom(tag)) if tag == "bundled" => Ok(None),
         VersionSpec::Tag(tag) => resolve_tag(&tag.to_string(), hooks).map(Some),
     }

@@ -5,7 +5,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use crate::error::{Context, ErrorKind, Fallible, ShimError, VoltaError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, ShimError, VoltaError};
 use crate::fs::read_dir_eager;
 use crate::layout::volta_home;
 use crate::sync::VoltaLock;
@@ -29,8 +29,10 @@ pub fn regenerate_shims_for_dir(dir: &Path) -> Fallible<()> {
 }
 
 fn get_shim_list_deduped(dir: &Path) -> Fallible<HashSet<String>> {
-    let contents = read_dir_eager(dir).with_context(|| ErrorKind::ReadDirError {
-        dir: dir.to_owned(),
+    let contents = read_dir_eager(dir).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ReadDir {
+            dir: dir.to_owned(),
+        })
     })?;
 
     #[cfg(unix)]
@@ -154,7 +156,7 @@ mod platform {
     //! Finally, filtering directory entries to find the shim files involves looking for the .cmd
     //! files.
     use std::ffi::OsStr;
-    use std::fs::{write, DirEntry, Metadata};
+    use std::fs::{DirEntry, Metadata, write};
 
     use super::ShimResult;
     use crate::error::{Context, ErrorKind, Fallible, ShimError};

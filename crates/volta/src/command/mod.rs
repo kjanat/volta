@@ -15,10 +15,10 @@ pub use fetch::Fetch;
 pub use install::Install;
 pub use list::List;
 pub use pin::Pin;
-pub use r#use::Use;
 pub use run::Run;
 pub use setup::Setup;
 pub use uninstall::Uninstall;
+pub use r#use::Use;
 
 use volta_core::error::{ExitCode, Fallible};
 use volta_core::session::Session;

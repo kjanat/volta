@@ -1,16 +1,16 @@
 //! Provides utilities for operating on the filesystem.
 
-use std::fs::{self, create_dir_all, read_dir, DirEntry, File, Metadata};
+use std::fs::{self, DirEntry, File, Metadata, create_dir_all, read_dir};
 use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::layout::volta_home;
 use retry::delay::Fibonacci;
-use retry::{retry, OperationResult};
-use tempfile::{tempdir_in, NamedTempFile, TempDir};
+use retry::{OperationResult, retry};
+use tempfile::{NamedTempFile, TempDir, tempdir_in};
 
 /// Opens a file, creating it if it doesn't exist
 ///
@@ -36,8 +36,10 @@ pub fn touch(path: &Path) -> io::Result<File> {
 pub fn remove_dir_if_exists<P: AsRef<Path>>(path: P) -> Fallible<()> {
     fs::remove_dir_all(&path)
         .or_else(ok_if_not_found)
-        .with_context(|| ErrorKind::DeleteDirectoryError {
-            directory: path.as_ref().to_owned(),
+        .with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::DeleteDir {
+                dir: path.as_ref().to_owned(),
+            })
         })
 }
 
@@ -49,8 +51,10 @@ pub fn remove_dir_if_exists<P: AsRef<Path>>(path: P) -> Fallible<()> {
 pub fn remove_file_if_exists<P: AsRef<Path>>(path: P) -> Fallible<()> {
     fs::remove_file(&path)
         .or_else(ok_if_not_found)
-        .with_context(|| ErrorKind::DeleteFileError {
-            file: path.as_ref().to_owned(),
+        .with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::DeleteFile {
+                file: path.as_ref().to_owned(),
+            })
         })
 }
 
@@ -137,8 +141,10 @@ where
 /// Returns an error if the temp file cannot be created.
 pub fn create_staging_file() -> Fallible<NamedTempFile> {
     let tmp_dir = volta_home()?.tmp_dir();
-    NamedTempFile::new_in(tmp_dir).with_context(|| ErrorKind::CreateTempFileError {
-        in_dir: tmp_dir.to_owned(),
+    NamedTempFile::new_in(tmp_dir).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::CreateTempFile {
+            in_dir: tmp_dir.to_owned(),
+        })
     })
 }
 
@@ -149,8 +155,10 @@ pub fn create_staging_file() -> Fallible<NamedTempFile> {
 /// Returns an error if the temp directory cannot be created.
 pub fn create_staging_dir() -> Fallible<TempDir> {
     let tmp_root = volta_home()?.tmp_dir();
-    tempdir_in(tmp_root).with_context(|| ErrorKind::CreateTempDirError {
-        in_dir: tmp_root.to_owned(),
+    tempdir_in(tmp_root).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::CreateTempDir {
+            in_dir: tmp_root.to_owned(),
+        })
     })
 }
 

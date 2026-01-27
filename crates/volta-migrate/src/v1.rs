@@ -1,12 +1,12 @@
+use std::fs::File;
 #[cfg(unix)]
 use std::fs::remove_file;
-use std::fs::File;
 use std::path::PathBuf;
 
 use super::empty::Empty;
 use super::v0::V0;
 use log::debug;
-use volta_core::error::{Context, ErrorKind, Fallible, VoltaError};
+use volta_core::error::{Context, ErrorKind, Fallible, FilesystemError, VoltaError};
 #[cfg(unix)]
 use volta_core::fs::{read_dir_eager, remove_file_if_exists};
 use volta_layout::v1;
@@ -31,8 +31,10 @@ impl V1 {
     /// accidentally mark an incomplete migration as completed
     fn complete_migration(home: v1::VoltaHome) -> Fallible<Self> {
         debug!("Writing layout marker file");
-        File::create(home.layout_file()).with_context(|| ErrorKind::CreateLayoutFileError {
-            file: home.layout_file().to_owned(),
+        File::create(home.layout_file()).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateLayoutFile {
+                file: home.layout_file().to_owned(),
+            })
         })?;
 
         Ok(Self { home })
@@ -46,8 +48,10 @@ impl TryFrom<Empty> for V1 {
         debug!("New Volta installation detected, creating fresh layout");
 
         let home = v1::VoltaHome::new(old.home);
-        home.create().with_context(|| ErrorKind::CreateDirError {
-            dir: home.root().to_owned(),
+        home.create().with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateDir {
+                dir: home.root().to_owned(),
+            })
         })?;
 
         Self::complete_migration(home)
@@ -61,26 +65,30 @@ impl TryFrom<V0> for V1 {
         debug!("Existing Volta installation detected, migrating from V0 layout");
 
         let new_home = v1::VoltaHome::new(old.home.root().to_owned());
-        new_home
-            .create()
-            .with_context(|| ErrorKind::CreateDirError {
+        new_home.create().with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateDir {
                 dir: new_home.root().to_owned(),
-            })?;
+            })
+        })?;
 
         #[cfg(unix)]
         {
             debug!("Removing unnecessary 'load.*' files");
-            let root_contents =
-                read_dir_eager(new_home.root()).with_context(|| ErrorKind::ReadDirError {
+            let root_contents = read_dir_eager(new_home.root()).with_context(|| {
+                ErrorKind::Filesystem(FilesystemError::ReadDir {
                     dir: new_home.root().to_owned(),
-                })?;
+                })
+            })?;
             for (entry, _) in root_contents {
                 let path = entry.path();
                 if let Some(stem) = path.file_stem()
-                    && stem == "load" && path.is_file() {
-                        remove_file(&path)
-                            .with_context(|| ErrorKind::DeleteFileError { file: path })?;
-                    }
+                    && stem == "load"
+                    && path.is_file()
+                {
+                    remove_file(&path).with_context(|| {
+                        ErrorKind::Filesystem(FilesystemError::DeleteFile { file: path })
+                    })?;
+                }
             }
 
             debug!("Removing old Volta binaries");

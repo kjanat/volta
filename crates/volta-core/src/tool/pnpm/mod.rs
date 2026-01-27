@@ -8,8 +8,8 @@ use crate::style::tool_version;
 use crate::sync::VoltaLock;
 
 use super::{
-    check_fetched, check_shim_reachable, debug_already_fetched, info_fetched, info_installed,
-    info_pinned, info_project_version, FetchStatus, Tool,
+    FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
+    info_installed, info_pinned, info_project_version,
 };
 
 mod fetch;
@@ -23,17 +23,17 @@ pub struct Pnpm {
 }
 
 impl Pnpm {
-    #[must_use] 
+    #[must_use]
     pub const fn new(version: Version) -> Self {
         Self { version }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn archive_basename(version: &str) -> String {
         format!("pnpm-{version}")
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn archive_filename(version: &str) -> String {
         format!("{}.tgz", Self::archive_basename(version))
     }
@@ -70,9 +70,10 @@ impl Tool for Pnpm {
         check_shim_reachable("pnpm");
 
         if let Ok(Some(project)) = session.project_platform()
-            && let Some(pnpm) = &project.pnpm {
-                info_project_version(tool_version("pnpm", pnpm), &self);
-            }
+            && let Some(pnpm) = &project.pnpm
+        {
+            info_project_version(tool_version("pnpm", pnpm), &self);
+        }
         Ok(())
     }
 

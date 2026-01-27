@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 use std::path::Path;
 
-use super::tool;
 use super::RegistryFormat;
+use super::tool;
 use crate::error::{ErrorKind, Fallible, VoltaError};
 use crate::tool::{Node, Npm, Pnpm, Tool};
 use serde::{Deserialize, Serialize};
@@ -143,7 +143,10 @@ impl TryFrom<RawEventHooks> for super::EventHooks {
     type Error = VoltaError;
 
     fn try_from(raw: RawEventHooks) -> Fallible<Self> {
-        let publish = raw.publish.map(std::convert::TryInto::try_into).transpose()?;
+        let publish = raw
+            .publish
+            .map(std::convert::TryInto::try_into)
+            .transpose()?;
 
         Ok(Self { publish })
     }
@@ -174,7 +177,10 @@ impl RawHookConfig {
         let npm = self.npm.map(|n| n.into_tool_hooks(base_dir)).transpose()?;
         let pnpm = self.pnpm.map(|p| p.into_tool_hooks(base_dir)).transpose()?;
         let yarn = self.yarn.map(|y| y.into_yarn_hooks(base_dir)).transpose()?;
-        let events = self.events.map(std::convert::TryInto::try_into).transpose()?;
+        let events = self
+            .events
+            .map(std::convert::TryInto::try_into)
+            .transpose()?;
         Ok(super::HookConfig {
             node,
             npm,

@@ -19,7 +19,7 @@ mod serial;
 pub mod yarn;
 
 pub use node::{
-    load_default_npm_version, Node, NODE_DISTRO_ARCH, NODE_DISTRO_EXTENSION, NODE_DISTRO_OS,
+    NODE_DISTRO_ARCH, NODE_DISTRO_EXTENSION, NODE_DISTRO_OS, Node, load_default_npm_version,
 };
 pub use npm::{Bundled, Npm};
 pub use package::{BinConfig, Package, PackageConfig, PackageManifest};

@@ -15,8 +15,8 @@ use crate::session::Session;
 use crate::signal::pass_control_to_shim;
 use crate::style::{note_prefix, tool_version};
 use crate::sync::VoltaLock;
-use crate::tool::package::{DirectInstall, InPlaceUpgrade, PackageConfig, PackageManager};
 use crate::tool::ToolSpec;
+use crate::tool::package::{DirectInstall, InPlaceUpgrade, PackageConfig, PackageManager};
 use log::{info, warn};
 
 pub enum Executor {
@@ -385,14 +385,15 @@ impl PackageLinkCommand {
         }
 
         if let Some(platform) = session.project_platform()?
-            && platform.node.major != config.platform.node.major {
-                warn!(
-                    "the current project is using {}, but package '{}' was linked using {}. These might not interact correctly.",
-                    tool_version("node", &platform.node),
-                    self.tool,
-                    tool_version("node", &config.platform.node)
-                );
-            }
+            && platform.node.major != config.platform.node.major
+        {
+            warn!(
+                "the current project is using {}, but package '{}' was linked using {}. These might not interact correctly.",
+                tool_version("node", &platform.node),
+                self.tool,
+                tool_version("node", &config.platform.node)
+            );
+        }
 
         Ok(())
     }

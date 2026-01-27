@@ -1,6 +1,6 @@
 use std::fs::write;
 
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::fs::touch;
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
@@ -59,8 +59,10 @@ impl Toolchain {
         let path = volta_home()?.default_platform_file();
         let src = touch(path)
             .and_then(|mut file| file.read_into_string())
-            .with_context(|| ErrorKind::ReadPlatformError {
-                file: path.to_owned(),
+            .with_context(|| {
+                ErrorKind::Filesystem(FilesystemError::ReadPlatform {
+                    file: path.to_owned(),
+                })
             })?;
 
         let platform: Option<PlatformSpec> = serial::Platform::try_from(src)?.into();
@@ -177,8 +179,10 @@ impl Toolchain {
             }
             None => write(path, "{}"),
         };
-        result.with_context(|| ErrorKind::WritePlatformError {
-            file: path.to_owned(),
+        result.with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::WritePlatform {
+                file: path.to_owned(),
+            })
         })
     }
 }

@@ -1,7 +1,7 @@
 //! Provides resolution of Yarn requirements into specific versions
 
 use super::super::registry::{
-    fetch_npm_registry, public_registry_index, PackageDetails, PackageIndex,
+    PackageDetails, PackageIndex, fetch_npm_registry, public_registry_index,
 };
 use super::super::registry_fetch_error;
 use super::metadata::{RawYarnIndex, YarnIndex};
@@ -9,7 +9,7 @@ use crate::error::{Context, ErrorKind, Fallible};
 use crate::hook::{RegistryFormat, YarnHooks};
 use crate::session::Session;
 use crate::style::progress_spinner;
-use crate::version::{parse, VersionSpec, Tag};
+use crate::version::{Tag, VersionSpec, parse};
 use attohttpc::Response;
 use log::debug;
 use nodejs_semver::{Range, Version};
@@ -84,16 +84,15 @@ fn fetch_yarn_index(package: &str) -> Fallible<(String, PackageIndex)> {
 fn resolve_custom_tag(tag: String) -> Fallible<Version> {
     // first try yarn2+, which uses "@yarnpkg/cli-dist" instead of "yarn"
     if let Ok((url, mut index)) = fetch_yarn_index("@yarnpkg/cli-dist")
-        && let Some(version) = index.tags.remove(&tag) {
-            debug!("Found yarn@{version} matching tag '{tag}' from {url}");
-            if version.major == 2 {
-                return Err(ErrorKind::Yarn2NotSupported.into());
-            }
-            return Ok(version);
+        && let Some(version) = index.tags.remove(&tag)
+    {
+        debug!("Found yarn@{version} matching tag '{tag}' from {url}");
+        if version.major == 2 {
+            return Err(ErrorKind::Yarn2NotSupported.into());
         }
-    debug!(
-        "Did not find yarn matching tag '{tag}' from @yarnpkg/cli-dist"
-    );
+        return Ok(version);
+    }
+    debug!("Did not find yarn matching tag '{tag}' from @yarnpkg/cli-dist");
 
     let (url, mut index) = fetch_yarn_index("yarn")?;
     match index.tags.remove(&tag) {
@@ -146,9 +145,7 @@ fn resolve_semver_from_registry(matching: &Range) -> Fallible<Version> {
             }
         }
     }
-    debug!(
-        "Did not find yarn matching requirement '{matching}' for @yarnpkg/cli-dist"
-    );
+    debug!("Did not find yarn matching requirement '{matching}' for @yarnpkg/cli-dist");
 
     let (url, index) = fetch_yarn_index("yarn")?;
 

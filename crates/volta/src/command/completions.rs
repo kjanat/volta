@@ -5,7 +5,7 @@ use clap_complete::Shell;
 use log::info;
 
 use volta_core::{
-    error::{Context, ErrorKind, ExitCode, Fallible},
+    error::{Context, ErrorKind, ExitCode, Fallible, FilesystemError},
     session::{ActivityKind, Session},
     style::{note_prefix, success_prefix},
 };
@@ -42,24 +42,22 @@ impl Command for Completions {
                 // The user may have passed a path that does not yet exist. If
                 // so, we create it, informing the user we have done so.
                 if let Some(parent) = path.parent()
-                    && !parent.is_dir() {
-                        info!(
-                            "{} {} does not exist, creating it",
-                            note_prefix(),
-                            parent.display()
-                        );
-                        std::fs::create_dir_all(parent).with_context(|| {
-                            ErrorKind::CreateDirError {
-                                dir: parent.to_path_buf(),
-                            }
-                        })?;
-                    }
+                    && !parent.is_dir()
+                {
+                    info!(
+                        "{} {} does not exist, creating it",
+                        note_prefix(),
+                        parent.display()
+                    );
+                    std::fs::create_dir_all(parent).with_context(|| {
+                        ErrorKind::Filesystem(FilesystemError::CreateDir {
+                            dir: parent.to_path_buf(),
+                        })
+                    })?;
+                }
 
-                let mut file = &std::fs::File::create(&path).with_context(|| {
-                    ErrorKind::CompletionsOutFileError {
-                        path: path.clone(),
-                    }
-                })?;
+                let mut file = &std::fs::File::create(&path)
+                    .with_context(|| ErrorKind::CompletionsOutFileError { path: path.clone() })?;
 
                 clap_complete::generate(self.shell, &mut app, app_name, &mut file);
 

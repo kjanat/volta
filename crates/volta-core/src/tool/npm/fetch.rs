@@ -1,11 +1,11 @@
 //! Provides fetcher for npm distributions
 
-use std::fs::{write, File};
+use std::fs::{File, write};
 use std::path::Path;
 
 use super::super::download_tool_error;
 use super::super::registry::public_registry_package;
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::fs::{
     create_staging_dir, create_staging_file, ensure_containing_dir_exists, rename, set_executable,
 };
@@ -40,9 +40,9 @@ pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Npm>>) -> Fallible<()> 
 
     if let Some(staging_file) = staging {
         ensure_containing_dir_exists(&cache_file).with_context(|| {
-            ErrorKind::ContainingDirError {
+            ErrorKind::Filesystem(FilesystemError::ContainingDir {
                 path: cache_file.clone(),
-            }
+            })
         })?;
         staging_file
             .persist(cache_file)
@@ -84,8 +84,9 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
     }
 
     let dest = volta_home()?.npm_image_dir(&version_string);
-    ensure_containing_dir_exists(&dest)
-        .with_context(|| ErrorKind::ContainingDirError { path: dest.clone() })?;
+    ensure_containing_dir_exists(&dest).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ContainingDir { path: dest.clone() })
+    })?;
 
     rename(temp.path().join("package"), &dest).with_context(|| ErrorKind::SetupToolImageError {
         tool: "npm".into(),
@@ -163,7 +164,7 @@ node "$basedir/{tool}-cli.js" "$@"
         ),
     )
     .and_then(|()| set_executable(&path))
-    .with_context(|| ErrorKind::WriteLauncherError { tool: tool.into() })
+    .with_context(|| ErrorKind::Filesystem(FilesystemError::WriteLauncher { tool: tool.into() }))
 }
 
 /// Overwrite the CMD launcher
@@ -180,5 +181,5 @@ node "%~dp0\{}-cli.js" %*
             tool
         ),
     )
-    .with_context(|| ErrorKind::WriteLauncherError { tool: tool.into() })
+    .with_context(|| ErrorKind::Filesystem(FilesystemError::WriteLauncher { tool: tool.into() }))
 }

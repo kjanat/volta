@@ -1,8 +1,8 @@
 use std::fmt::{self, Display};
 
 use super::{
-    check_fetched, check_shim_reachable, debug_already_fetched, info_fetched, info_installed,
-    info_pinned, info_project_version, FetchStatus, Tool,
+    FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
+    info_installed, info_pinned, info_project_version,
 };
 use crate::error::{ErrorKind, Fallible};
 use crate::inventory::yarn_available;
@@ -23,17 +23,17 @@ pub struct Yarn {
 }
 
 impl Yarn {
-    #[must_use] 
+    #[must_use]
     pub const fn new(version: Version) -> Self {
         Self { version }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn archive_basename(version: &str) -> String {
         format!("yarn-v{version}")
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn archive_filename(version: &str) -> String {
         format!("{}.tar.gz", Self::archive_basename(version))
     }
@@ -69,9 +69,10 @@ impl Tool for Yarn {
         check_shim_reachable("yarn");
 
         if let Ok(Some(project)) = session.project_platform()
-            && let Some(yarn) = &project.yarn {
-                info_project_version(tool_version("yarn", yarn), &self);
-            }
+            && let Some(yarn) = &project.yarn
+        {
+            info_project_version(tool_version("yarn", yarn), &self);
+        }
         Ok(())
     }
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {

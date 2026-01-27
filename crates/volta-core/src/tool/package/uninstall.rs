@@ -71,9 +71,7 @@ fn remove_config_and_shim(bin_name: &str, pkg_name: &str) -> Fallible<()> {
     shim::delete(bin_name)?;
     let config_file = volta_home()?.default_tool_bin_config(bin_name);
     remove_file_if_exists(config_file)?;
-    info!(
-        "Removed executable '{bin_name}' installed by '{pkg_name}'"
-    );
+    info!("Removed executable '{bin_name}' installed by '{pkg_name}'");
     Ok(())
 }
 
@@ -85,15 +83,18 @@ fn binaries_from_package(package: &str) -> Fallible<Vec<String>> {
     dir_entry_match(bin_config_dir, |entry| {
         let path = entry.path();
         if let Ok(config) = BinConfig::from_file(path)
-            && config.package == package {
-                return Some(config.name);
-            }
+            && config.package == package
+        {
+            return Some(config.name);
+        }
         None
     })
     .or_else(ok_if_not_found)
-    .with_context(|| ErrorKind::Binary(BinaryError::ReadConfigDirError {
-        dir: bin_config_dir.to_owned(),
-    }))
+    .with_context(|| {
+        ErrorKind::Binary(BinaryError::ReadConfigDirError {
+            dir: bin_config_dir.to_owned(),
+        })
+    })
 }
 
 /// Remove the link to the package in the shared lib directory
@@ -109,9 +110,10 @@ fn remove_shared_link_dir(name: &str) -> Fallible<()> {
         shared_lib_dir.pop();
 
         if let Ok(mut entries) = read_dir_eager(&shared_lib_dir)
-            && entries.next().is_none() {
-                remove_dir_if_exists(&shared_lib_dir)?;
-            }
+            && entries.next().is_none()
+        {
+            remove_dir_if_exists(&shared_lib_dir)?;
+        }
     }
 
     Ok(())

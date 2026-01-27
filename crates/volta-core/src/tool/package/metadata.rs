@@ -4,7 +4,7 @@ use std::io;
 use std::path::Path;
 
 use super::manager::PackageManager;
-use crate::error::{BinaryError, Context, ErrorKind, Fallible, VoltaError};
+use crate::error::{BinaryError, Context, ErrorKind, Fallible, FilesystemError, VoltaError};
 use crate::fs::ensure_containing_dir_exists;
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
@@ -40,8 +40,10 @@ impl PackageConfig {
     where
         P: AsRef<Path>,
     {
-        let config = File::open(&file).with_context(|| ErrorKind::ReadPackageConfigError {
-            file: file.as_ref().to_owned(),
+        let config = File::open(&file).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::ReadPackageConfig {
+                file: file.as_ref().to_owned(),
+            })
         })?;
         serde_json::from_reader(config).with_context(|| ErrorKind::ParsePackageConfigError)
     }
@@ -60,9 +62,9 @@ impl PackageConfig {
                 } else {
                     Err(VoltaError::from_source(
                         error,
-                        ErrorKind::ReadPackageConfigError {
+                        ErrorKind::Filesystem(FilesystemError::ReadPackageConfig {
                             file: file.as_ref().to_owned(),
-                        },
+                        }),
                     ))
                 }
             }
@@ -81,15 +83,15 @@ impl PackageConfig {
         let config_file_path = volta_home()?.default_package_config_file(&self.name);
 
         ensure_containing_dir_exists(&config_file_path).with_context(|| {
-            ErrorKind::ContainingDirError {
+            ErrorKind::Filesystem(FilesystemError::ContainingDir {
                 path: config_file_path.clone(),
-            }
+            })
         })?;
 
         let file = File::create(&config_file_path).with_context(|| {
-            ErrorKind::WritePackageConfigError {
+            ErrorKind::Filesystem(FilesystemError::WritePackageConfig {
                 file: config_file_path,
-            }
+            })
         })?;
         serde_json::to_writer_pretty(file, &self)
             .with_context(|| ErrorKind::StringifyPackageConfigError)
@@ -169,15 +171,16 @@ impl BinConfig {
         let config_file_path = volta_home()?.default_tool_bin_config(&self.name);
 
         ensure_containing_dir_exists(&config_file_path).with_context(|| {
-            ErrorKind::ContainingDirError {
+            ErrorKind::Filesystem(FilesystemError::ContainingDir {
                 path: config_file_path.clone(),
-            }
+            })
         })?;
 
-        let file =
-            File::create(&config_file_path).with_context(|| ErrorKind::WriteBinConfigError {
+        let file = File::create(&config_file_path).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::WriteBinConfig {
                 file: config_file_path,
-            })?;
+            })
+        })?;
         serde_json::to_writer_pretty(file, &self)
             .with_context(|| ErrorKind::StringifyBinConfigError)
     }

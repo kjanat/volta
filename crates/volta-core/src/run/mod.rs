@@ -154,13 +154,16 @@ fn debug_active_image(image: &RuntimeImage) {
         image
             .resolve_npm()
             .ok()
-            .as_ref().map_or_else(|| "Bundled with Node".into(), format_tool_version),
+            .as_ref()
+            .map_or_else(|| "Bundled with Node".into(), format_tool_version),
         image
             .pnpm
-            .as_ref().map_or_else(|| "None".into(), format_tool_version),
+            .as_ref()
+            .map_or_else(|| "None".into(), format_tool_version),
         image
             .yarn
-            .as_ref().map_or_else(|| "None".into(), format_tool_version),
+            .as_ref()
+            .map_or_else(|| "None".into(), format_tool_version),
     );
 }
 

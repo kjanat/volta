@@ -138,7 +138,7 @@ fn execute_binary(bin: &str, base_path: &Path, extra_arg: Option<String>) -> Fal
             return Err(ErrorKind::InvalidHookCommand {
                 command: String::from(bin.trim()),
             }
-            .into())
+            .into());
         }
     };
 
@@ -178,7 +178,7 @@ fn execute_binary(bin: &str, base_path: &Path, extra_arg: Option<String>) -> Fal
 
 #[cfg(test)]
 pub mod tests {
-    use super::{calculate_extension, DistroHook, MetadataHook};
+    use super::{DistroHook, MetadataHook, calculate_extension};
     use crate::tool::{NODE_DISTRO_ARCH, NODE_DISTRO_OS};
     use nodejs_semver::Version;
 

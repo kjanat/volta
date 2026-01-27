@@ -4,9 +4,9 @@ use nodejs_semver::{Range, Version};
 use crate::error::{ErrorKind, Fallible};
 use crate::hook::ToolHooks;
 use crate::session::Session;
-use crate::tool::registry::{fetch_npm_registry, public_registry_index, PackageIndex};
+use crate::tool::registry::{PackageIndex, fetch_npm_registry, public_registry_index};
 use crate::tool::{PackageDetails, Pnpm};
-use crate::version::{VersionSpec, Tag};
+use crate::version::{Tag, VersionSpec};
 
 /// # Errors
 ///

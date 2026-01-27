@@ -2,8 +2,8 @@ use std::fmt::{self, Display};
 
 use super::node::load_default_npm_version;
 use super::{
-    check_fetched, check_shim_reachable, debug_already_fetched, info_fetched, info_installed,
-    info_pinned, info_project_version, FetchStatus, Tool,
+    FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
+    info_installed, info_pinned, info_project_version,
 };
 use crate::error::{Context, ErrorKind, Fallible};
 use crate::inventory::npm_available;
@@ -24,17 +24,17 @@ pub struct Npm {
 }
 
 impl Npm {
-    #[must_use] 
+    #[must_use]
     pub const fn new(version: Version) -> Self {
         Self { version }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn archive_basename(version: &str) -> String {
         format!("npm-{version}")
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn archive_filename(version: &str) -> String {
         format!("{}.tgz", Self::archive_basename(version))
     }
@@ -70,9 +70,10 @@ impl Tool for Npm {
         check_shim_reachable("npm");
 
         if let Ok(Some(project)) = session.project_platform()
-            && let Some(npm) = &project.npm {
-                info_project_version(tool_version("npm", npm), &self);
-            }
+            && let Some(npm) = &project.npm
+        {
+            info_project_version(tool_version("npm", npm), &self);
+        }
         Ok(())
     }
     fn pin(self: Box<Self>, session: &mut Session) -> Fallible<()> {

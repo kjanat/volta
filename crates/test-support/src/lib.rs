@@ -14,9 +14,9 @@ pub mod matchers;
 pub mod paths;
 pub mod process;
 
-/// Re-export `process::error` as `process_error` for backwards compatibility.
-pub use process::error as process_error;
 /// Re-export `process::Builder` as `ProcessBuilder` for backwards compatibility.
 pub use process::Builder as ProcessBuilder;
 /// Re-export `process::Error` as `ProcessError` for backwards compatibility.
 pub use process::Error as ProcessError;
+/// Re-export `process::error` as `process_error` for backwards compatibility.
+pub use process::error as process_error;

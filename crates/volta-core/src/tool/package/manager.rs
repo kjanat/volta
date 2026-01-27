@@ -19,7 +19,7 @@ pub enum PackageManager {
 impl PackageManager {
     /// Given the `package_root`, returns the directory where the source is stored for this
     /// package manager. This will include the top-level `node_modules`, where appropriate.
-    #[must_use] 
+    #[must_use]
     pub fn source_dir(self, package_root: PathBuf) -> PathBuf {
         let mut path = self.source_root(package_root);
         path.push("node_modules");
@@ -30,7 +30,7 @@ impl PackageManager {
     /// Given the `package_root`, returns the root of the source directory. This directory will
     /// contain the top-level `node-modules`
     #[cfg(unix)]
-    #[must_use] 
+    #[must_use]
     pub fn source_root(self, package_root: PathBuf) -> PathBuf {
         let mut path = package_root;
         match self {
@@ -74,7 +74,7 @@ impl PackageManager {
     /// Given the `package_root`, returns the directory where binaries are stored for this package
     /// manager.
     #[cfg(unix)]
-    #[must_use] 
+    #[must_use]
     pub fn binary_dir(self, package_root: PathBuf) -> PathBuf {
         // On Unix, the binaries are always within a `bin` subdirectory for both npm and Yarn
         let mut path = package_root;
@@ -130,15 +130,15 @@ impl PackageManager {
             let mut new_path = global_bin_dir;
             for (name, value) in command.get_envs() {
                 if name == "PATH"
-                    && let Some(old_path) = value {
-                        #[cfg(unix)]
-                        let path_delimiter = OsStr::new(":");
-                        #[cfg(windows)]
-                        let path_delimiter = OsStr::new(";");
-                        new_path =
-                            PathBuf::from([new_path.as_os_str(), old_path].join(path_delimiter));
-                        break;
-                    }
+                    && let Some(old_path) = value
+                {
+                    #[cfg(unix)]
+                    let path_delimiter = OsStr::new(":");
+                    #[cfg(windows)]
+                    let path_delimiter = OsStr::new(";");
+                    new_path = PathBuf::from([new_path.as_os_str(), old_path].join(path_delimiter));
+                    break;
+                }
             }
             command.env("PATH", new_path);
         }

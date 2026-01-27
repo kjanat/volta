@@ -6,13 +6,13 @@ use std::env;
 use std::fmt::{self, Display, Formatter};
 use std::process::exit;
 
+use crate::VOLTA_FEATURE_PNPM;
 use crate::error::{ExitCode, Fallible, VoltaError};
 use crate::event::Log;
 use crate::hook::{HookConfig, LazyHookConfig};
 use crate::platform::PlatformSpec;
 use crate::project::{LazyProject, Project};
 use crate::toolchain::{LazyToolchain, Toolchain};
-use crate::VOLTA_FEATURE_PNPM;
 use log::debug;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use nodejs_semver::Version;
 use once_cell::unsync::OnceCell;
 
-use crate::error::{Context, ErrorKind, Fallible, VoltaError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, VoltaError};
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
 use crate::tool::BinConfig;
@@ -20,7 +20,7 @@ mod serial;
 #[cfg(test)]
 mod tests;
 
-use serial::{update_manifest, Manifest, ManifestKey};
+use serial::{Manifest, ManifestKey, update_manifest};
 
 /// A lazily loaded Project
 #[allow(clippy::module_name_repetitions)]
@@ -73,7 +73,8 @@ pub struct Project {
 impl Project {
     /// Creates an optional Project instance from the current directory
     fn for_current_dir() -> Fallible<Option<Self>> {
-        let current_dir = env::current_dir().with_context(|| ErrorKind::CurrentDirError)?;
+        let current_dir = env::current_dir()
+            .with_context(|| ErrorKind::Filesystem(FilesystemError::CurrentDir))?;
         Self::for_dir(current_dir)
     }
 

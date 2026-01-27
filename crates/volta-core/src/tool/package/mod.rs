@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Tool;
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::fs::{ensure_containing_dir_exists, remove_dir_if_exists, rename, symlink_dir};
 use crate::layout::volta_home;
 use crate::platform::{PlatformSpec, RuntimeImage};
@@ -13,7 +13,7 @@ use crate::style::{success_prefix, tool_version};
 use crate::sync::VoltaLock;
 use crate::version::VersionSpec;
 use log::info;
-use tempfile::{tempdir_in, TempDir};
+use tempfile::{TempDir, tempdir_in};
 
 mod configure;
 mod install;
@@ -268,11 +268,7 @@ enum NeedsScope {
 
 impl From<bool> for NeedsScope {
     fn from(value: bool) -> Self {
-        if value {
-            Self::Yes
-        } else {
-            Self::No
-        }
+        if value { Self::Yes } else { Self::No }
     }
 }
 
@@ -294,20 +290,26 @@ fn setup_staging_directory(manager: PackageManager, needs_scope: NeedsScope) -> 
     if needs_scope == NeedsScope::Yes {
         staging_root.push("scope");
     }
-    create_dir_all(&staging_root).with_context(|| ErrorKind::ContainingDirError {
-        path: staging_root.clone(),
+    create_dir_all(&staging_root).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ContainingDir {
+            path: staging_root.clone(),
+        })
     })?;
-    let staging = tempdir_in(&staging_root).with_context(|| ErrorKind::CreateTempDirError {
-        in_dir: staging_root,
+    let staging = tempdir_in(&staging_root).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::CreateTempDir {
+            in_dir: staging_root,
+        })
     })?;
 
     let source_dir = manager.source_dir(staging.path().to_owned());
-    ensure_containing_dir_exists(&source_dir)
-        .with_context(|| ErrorKind::ContainingDirError { path: source_dir })?;
+    ensure_containing_dir_exists(&source_dir).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ContainingDir { path: source_dir })
+    })?;
 
     let binary_dir = manager.binary_dir(staging.path().to_owned());
-    ensure_containing_dir_exists(&binary_dir)
-        .with_context(|| ErrorKind::ContainingDirError { path: binary_dir })?;
+    ensure_containing_dir_exists(&binary_dir).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ContainingDir { path: binary_dir })
+    })?;
 
     Ok(staging)
 }
@@ -321,8 +323,10 @@ where
     remove_dir_if_exists(&package_dir)?;
 
     // Handle scoped packages (@vue/cli), which have an extra directory for the scope
-    ensure_containing_dir_exists(&package_dir).with_context(|| ErrorKind::ContainingDirError {
-        path: package_dir.clone(),
+    ensure_containing_dir_exists(&package_dir).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ContainingDir {
+            path: package_dir.clone(),
+        })
     })?;
 
     rename(staging_dir, &package_dir).with_context(|| ErrorKind::SetupToolImageError {
@@ -344,11 +348,15 @@ fn link_package_to_shared_dir(package_name: &str, manager: PackageManager) -> Fa
     remove_dir_if_exists(&target)?;
 
     // Handle scoped packages (@vue/cli), which have an extra directory for the scope
-    ensure_containing_dir_exists(&target).with_context(|| ErrorKind::ContainingDirError {
-        path: target.clone(),
+    ensure_containing_dir_exists(&target).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ContainingDir {
+            path: target.clone(),
+        })
     })?;
 
-    symlink_dir(source, target).with_context(|| ErrorKind::CreateSharedLinkError {
-        name: package_name.into(),
+    symlink_dir(source, target).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::CreateSharedLink {
+            name: package_name.into(),
+        })
     })
 }

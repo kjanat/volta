@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::Path;
 
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::fs::read_dir_eager;
 use crate::layout::volta_home;
 use crate::tool::PackageConfig;
@@ -130,8 +130,10 @@ pub fn package_configs() -> Fallible<BTreeSet<PackageConfig>> {
 /// Reads the contents of a directory and returns the set of all versions found
 /// in the directory's listing by parsing the directory names as semantic versions
 fn read_versions(dir: &Path) -> Fallible<BTreeSet<Version>> {
-    let contents = read_dir_eager(dir).with_context(|| ErrorKind::ReadDirError {
-        dir: dir.to_owned(),
+    let contents = read_dir_eager(dir).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ReadDir {
+            dir: dir.to_owned(),
+        })
     })?;
 
     Ok(contents

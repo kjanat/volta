@@ -1,13 +1,13 @@
 //! Provides fetcher for pnpm distributions
 
-use std::fs::{write, File};
+use std::fs::{File, write};
 use std::path::Path;
 
 use archive::{Archive, Tarball};
 use log::debug;
 use nodejs_semver::Version;
 
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::fs::{
     create_staging_dir, create_staging_file, ensure_containing_dir_exists, rename, set_executable,
 };
@@ -15,7 +15,7 @@ use crate::hook::ToolHooks;
 use crate::layout::volta_home;
 use crate::style::{progress_bar, tool_version};
 use crate::tool::registry::public_registry_package;
-use crate::tool::{self, download_tool_error, Pnpm};
+use crate::tool::{self, Pnpm, download_tool_error};
 use crate::version::VersionSpec;
 
 pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible<()> {
@@ -40,9 +40,9 @@ pub fn fetch(version: &Version, hooks: Option<&ToolHooks<Pnpm>>) -> Fallible<()>
 
     if let Some(staging_file) = staging {
         ensure_containing_dir_exists(&cache_file).with_context(|| {
-            ErrorKind::ContainingDirError {
+            ErrorKind::Filesystem(FilesystemError::ContainingDir {
                 path: cache_file.clone(),
-            }
+            })
         })?;
         staging_file
             .persist(cache_file)
@@ -86,8 +86,9 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
     }
 
     let dest = volta_home()?.pnpm_image_dir(&version_string);
-    ensure_containing_dir_exists(&dest)
-        .with_context(|| ErrorKind::ContainingDirError { path: dest.clone() })?;
+    ensure_containing_dir_exists(&dest).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ContainingDir { path: dest.clone() })
+    })?;
 
     rename(temp.path().join("package"), &dest).with_context(|| ErrorKind::SetupToolImageError {
         tool: "pnpm".into(),
@@ -164,7 +165,7 @@ node "$basedir/{tool}.cjs" "$@"
         ),
     )
     .and_then(|()| set_executable(&path))
-    .with_context(|| ErrorKind::WriteLauncherError { tool: tool.into() })
+    .with_context(|| ErrorKind::Filesystem(FilesystemError::WriteLauncher { tool: tool.into() }))
 }
 
 /// Create CMD executable launchers for the pnpm and pnpx binaries for Windows
@@ -174,5 +175,5 @@ fn write_cmd_launcher(base_path: &Path, tool: &str) -> Fallible<()> {
         base_path.join(format!("{}.cmd", tool)),
         format!("@echo off\nnode \"%~dp0\\{}.cjs\" %*", tool),
     )
-    .with_context(|| ErrorKind::WriteLauncherError { tool: tool.into() })
+    .with_context(|| ErrorKind::Filesystem(FilesystemError::WriteLauncher { tool: tool.into() }))
 }

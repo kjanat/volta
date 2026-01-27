@@ -7,7 +7,7 @@ use super::super::download_tool_error;
 use super::super::registry::{
     find_unpack_dir, public_registry_package, scoped_public_registry_package,
 };
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::fs::{
     create_staging_dir, create_staging_file, ensure_containing_dir_exists, rename, set_executable,
 };
@@ -42,9 +42,9 @@ pub fn fetch(version: &Version, hooks: Option<&YarnHooks>) -> Fallible<()> {
 
     if let Some(staging_file) = staging {
         ensure_containing_dir_exists(&cache_file).with_context(|| {
-            ErrorKind::ContainingDirError {
+            ErrorKind::Filesystem(FilesystemError::ContainingDir {
                 path: cache_file.clone(),
-            }
+            })
         })?;
         staging_file
             .persist(cache_file)
@@ -82,8 +82,9 @@ fn unpack_archive(archive: Box<dyn Archive>, version: &Version) -> Fallible<()> 
     ensure_bin_is_executable(&unpack_dir, "yarn")?;
 
     let dest = volta_home()?.yarn_image_dir(&version_string);
-    ensure_containing_dir_exists(&dest)
-        .with_context(|| ErrorKind::ContainingDirError { path: dest.clone() })?;
+    ensure_containing_dir_exists(&dest).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ContainingDir { path: dest.clone() })
+    })?;
 
     rename(unpack_dir, &dest).with_context(|| ErrorKind::SetupToolImageError {
         tool: "Yarn".into(),

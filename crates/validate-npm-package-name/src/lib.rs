@@ -1,7 +1,7 @@
 //! A Rust implementation of the validation rules from the core JS package
 //! [`validate-npm-package-name`](https://github.com/npm/validate-npm-package-name/).
 
-use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use regex::Regex;
 
 /// The set of characters to encode, matching the characters encoded by
@@ -17,9 +17,11 @@ static ENCODE_URI_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'(')
     .remove(b')');
 
-static SCOPED_PACKAGE: std::sync::LazyLock<Regex> =
-    std::sync::LazyLock::new(|| Regex::new(r"^(?:@([^/]+?)[/])?([^/]+?)$").expect("regex is valid"));
-static SPECIAL_CHARS: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"[~'!()*]").expect("regex is valid"));
+static SCOPED_PACKAGE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r"^(?:@([^/]+?)[/])?([^/]+?)$").expect("regex is valid")
+});
+static SPECIAL_CHARS: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"[~'!()*]").expect("regex is valid"));
 const BLACKLIST: [&str; 2] = ["node_modules", "favicon.ico"];
 
 // Borrowed from https://github.com/juliangruber/builtins
@@ -82,12 +84,12 @@ pub enum Validity {
 }
 
 impl Validity {
-    #[must_use] 
+    #[must_use]
     pub const fn valid_for_old_packages(&self) -> bool {
         matches!(self, Self::Valid | Self::ValidForOldPackages { .. })
     }
 
-    #[must_use] 
+    #[must_use]
     pub const fn valid_for_new_packages(&self) -> bool {
         matches!(self, Self::Valid)
     }
@@ -150,15 +152,21 @@ pub fn validate(name: &str) -> Validity {
     if utf8_percent_encode(name, ENCODE_URI_SET).to_string() != name {
         // Maybe it's a scoped package name, like @user/package
         if let Some(captures) = SCOPED_PACKAGE.captures(name) {
-            let valid_scope_name = captures
-                .get(1)
-                .map(|scope| scope.as_str())
-                .is_none_or(|scope| utf8_percent_encode(scope, ENCODE_URI_SET).to_string() == scope);
+            let valid_scope_name =
+                captures
+                    .get(1)
+                    .map(|scope| scope.as_str())
+                    .is_none_or(|scope| {
+                        utf8_percent_encode(scope, ENCODE_URI_SET).to_string() == scope
+                    });
 
-            let valid_package_name = captures
-                .get(2)
-                .map(|package| package.as_str())
-                .is_none_or(|package| utf8_percent_encode(package, ENCODE_URI_SET).to_string() == package);
+            let valid_package_name =
+                captures
+                    .get(2)
+                    .map(|package| package.as_str())
+                    .is_none_or(|package| {
+                        utf8_percent_encode(package, ENCODE_URI_SET).to_string() == package
+                    });
 
             if valid_scope_name && valid_package_name {
                 return done(warnings, errors);

@@ -18,9 +18,10 @@ pub fn send_events(command: &str, events: &[Event]) {
                 .and_then(|_| write_events_file(&events_json));
             if let Some(child_process) = &mut spawn_process(command, tempfile_path)
                 && let Some(p_stdin) = child_process.stdin.as_mut()
-                    && let Err(error) = writeln!(p_stdin, "{events_json}") {
-                        debug!("Could not write events to executable stdin: {error:?}");
-                    }
+                && let Err(error) = writeln!(p_stdin, "{events_json}")
+            {
+                debug!("Could not write events to executable stdin: {error:?}");
+            }
         }
         Err(error) => {
             debug!("Could not serialize events data to JSON: {error:?}");

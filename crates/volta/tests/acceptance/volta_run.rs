@@ -1,5 +1,5 @@
 use crate::support::sandbox::{
-    sandbox, DistroMetadata, NodeFixture, NpmFixture, PnpmFixture, Yarn1Fixture, YarnBerryFixture,
+    DistroMetadata, NodeFixture, NpmFixture, PnpmFixture, Yarn1Fixture, YarnBerryFixture, sandbox,
 };
 use hamcrest2::assert_that;
 use hamcrest2::prelude::*;

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use super::empty::Empty;
 use super::v3::V3;
 use log::debug;
-use volta_core::error::{Context, ErrorKind, Fallible, VoltaError};
+use volta_core::error::{Context, ErrorKind, Fallible, FilesystemError, VoltaError};
 #[cfg(windows)]
 use volta_core::fs::read_dir_eager;
 use volta_core::fs::remove_file_if_exists;
@@ -31,8 +31,10 @@ impl V4 {
     /// accidentally mark an incomplete migration as completed
     fn complete_migration(home: v4::VoltaHome) -> Fallible<Self> {
         debug!("Writing layout marker file");
-        File::create(home.layout_file()).with_context(|| ErrorKind::CreateLayoutFileError {
-            file: home.layout_file().to_owned(),
+        File::create(home.layout_file()).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateLayoutFile {
+                file: home.layout_file().to_owned(),
+            })
         })?;
 
         Ok(Self { home })
@@ -46,8 +48,10 @@ impl TryFrom<Empty> for V4 {
         debug!("New Volta installation detected, creating fresh layout");
 
         let home = v4::VoltaHome::new(old.home);
-        home.create().with_context(|| ErrorKind::CreateDirError {
-            dir: home.root().to_owned(),
+        home.create().with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateDir {
+                dir: home.root().to_owned(),
+            })
         })?;
 
         Self::complete_migration(home)
@@ -61,11 +65,11 @@ impl TryFrom<V3> for V4 {
         debug!("Migrating from V3 layout");
 
         let new_home = v4::VoltaHome::new(old.home.root().to_owned());
-        new_home
-            .create()
-            .with_context(|| ErrorKind::CreateDirError {
+        new_home.create().with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateDir {
                 dir: new_home.root().to_owned(),
-            })?;
+            })
+        })?;
 
         // Perform the core of the migration
         #[cfg(windows)]
@@ -95,8 +99,10 @@ impl TryFrom<V3> for V4 {
 fn migrate_shims(new_home: &v4::VoltaHome) -> Fallible<()> {
     use std::ffi::OsStr;
 
-    let entries = read_dir_eager(new_home.shim_dir()).with_context(|| ErrorKind::ReadDirError {
-        dir: new_home.shim_dir().to_owned(),
+    let entries = read_dir_eager(new_home.shim_dir()).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ReadDir {
+            dir: new_home.shim_dir().to_owned(),
+        })
     })?;
 
     for (entry, metadata) in entries {
@@ -125,21 +131,26 @@ fn migrate_shared_directory(new_home: &v4::VoltaHome) -> Fallible<()> {
     use std::fs::read_link;
     use volta_core::fs::{remove_dir_if_exists, symlink_dir};
 
-    let entries =
-        read_dir_eager(new_home.shared_lib_root()).with_context(|| ErrorKind::ReadDirError {
+    let entries = read_dir_eager(new_home.shared_lib_root()).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::ReadDir {
             dir: new_home.shared_lib_root().to_owned(),
-        })?;
+        })
+    })?;
 
     for (entry, metadata) in entries {
         if metadata.is_symlink() {
             let path = entry.path();
-            let source = read_link(&path).with_context(|| ErrorKind::ReadDirError {
-                dir: new_home.shared_lib_root().to_owned(),
+            let source = read_link(&path).with_context(|| {
+                ErrorKind::Filesystem(FilesystemError::ReadDir {
+                    dir: new_home.shared_lib_root().to_owned(),
+                })
             })?;
 
             remove_dir_if_exists(&path)?;
-            symlink_dir(source, path).with_context(|| ErrorKind::CreateSharedLinkError {
-                name: entry.file_name().to_string_lossy().to_string(),
+            symlink_dir(source, path).with_context(|| {
+                ErrorKind::Filesystem(FilesystemError::CreateSharedLink {
+                    name: entry.file_name().to_string_lossy().to_string(),
+                })
             })?;
         }
     }

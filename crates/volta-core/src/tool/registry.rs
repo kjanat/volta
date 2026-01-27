@@ -6,8 +6,8 @@ use crate::error::{Context, ErrorKind, Fallible};
 use crate::fs::read_dir_eager;
 use crate::style::progress_spinner;
 use crate::version::{hashmap_version_serde, version_serde};
-use attohttpc::header::ACCEPT;
 use attohttpc::Response;
+use attohttpc::header::ACCEPT;
 use cfg_if::cfg_if;
 use nodejs_semver::Version;
 use serde::Deserialize;
@@ -79,9 +79,10 @@ pub fn find_unpack_dir(in_dir: &Path) -> Fallible<PathBuf> {
 
     // if there is only one directory, return that
     if let [(entry, metadata)] = dirs.as_slice()
-        && metadata.is_dir() {
-            return Ok(entry.path());
-        }
+        && metadata.is_dir()
+    {
+        return Ok(entry.path());
+    }
     // there is more than just a single directory here, something is wrong
     Err(ErrorKind::PackageUnpackError.into())
 }

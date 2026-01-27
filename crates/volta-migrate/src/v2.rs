@@ -1,4 +1,4 @@
-use std::fs::{read_to_string, write, File};
+use std::fs::{File, read_to_string, write};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -7,7 +7,7 @@ use super::v1::V1;
 use log::debug;
 use nodejs_semver::Version;
 use tempfile::tempdir_in;
-use volta_core::error::{Context, ErrorKind, Fallible, VoltaError};
+use volta_core::error::{Context, ErrorKind, Fallible, FilesystemError, VoltaError};
 use volta_core::fs::{read_dir_eager, remove_dir_if_exists, remove_file_if_exists, rename};
 use volta_core::tool::load_default_npm_version;
 use volta_core::toolchain::serial::Platform;
@@ -34,8 +34,10 @@ impl V2 {
     /// accidentally mark an incomplete migration as completed
     fn complete_migration(home: v2::VoltaHome) -> Fallible<Self> {
         debug!("Writing layout marker file");
-        File::create(home.layout_file()).with_context(|| ErrorKind::CreateLayoutFileError {
-            file: home.layout_file().to_owned(),
+        File::create(home.layout_file()).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateLayoutFile {
+                file: home.layout_file().to_owned(),
+            })
         })?;
 
         Ok(Self { home })
@@ -49,8 +51,10 @@ impl TryFrom<Empty> for V2 {
         debug!("New Volta installation detected, creating fresh layout");
 
         let home = v2::VoltaHome::new(old.home);
-        home.create().with_context(|| ErrorKind::CreateDirError {
-            dir: home.root().to_owned(),
+        home.create().with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateDir {
+                dir: home.root().to_owned(),
+            })
         })?;
 
         Self::complete_migration(home)
@@ -64,11 +68,11 @@ impl TryFrom<V1> for V2 {
         debug!("Migrating from V1 layout");
 
         let new_home = v2::VoltaHome::new(old.home.root().to_owned());
-        new_home
-            .create()
-            .with_context(|| ErrorKind::CreateDirError {
+        new_home.create().with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateDir {
                 dir: new_home.root().to_owned(),
-            })?;
+            })
+        })?;
 
         // Perform the core of the migration
         clear_default_npm(old.home.default_platform_file())?;
@@ -97,9 +101,9 @@ fn clear_default_npm(platform_file: &Path) -> Fallible<()> {
             }
             return Err(VoltaError::from_source(
                 error,
-                ErrorKind::ReadPlatformError {
+                ErrorKind::Filesystem(FilesystemError::ReadPlatform {
                     file: platform_file.to_path_buf(),
-                },
+                }),
             ));
         }
     };
@@ -107,15 +111,16 @@ fn clear_default_npm(platform_file: &Path) -> Fallible<()> {
 
     if let Some(node_version) = &mut existing_platform.node
         && let Some(npm) = &node_version.npm
-            && let Ok(default_npm) = load_default_npm_version(&node_version.runtime)
-                && *npm == default_npm {
-                    node_version.npm = None;
-                    write(platform_file, existing_platform.into_json()?).with_context(|| {
-                        ErrorKind::WritePlatformError {
-                            file: platform_file.to_owned(),
-                        }
-                    })?;
-                }
+        && let Ok(default_npm) = load_default_npm_version(&node_version.runtime)
+        && *npm == default_npm
+    {
+        node_version.npm = None;
+        write(platform_file, existing_platform.into_json()?).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::WritePlatform {
+                file: platform_file.to_owned(),
+            })
+        })?;
+    }
 
     Ok(())
 }
@@ -127,13 +132,16 @@ fn clear_default_npm(platform_file: &Path) -> Fallible<()> {
 /// bundled npm version in the file structure any more. This also will make it slightly easier to access
 /// the Node image, as we no longer will need to look up the bundled npm version every time.
 fn shift_node_images(old_home: &v1::VoltaHome, new_home: &v2::VoltaHome) -> Fallible<()> {
-    let temp_dir =
-        tempdir_in(new_home.tmp_dir()).with_context(|| ErrorKind::CreateTempDirError {
+    let temp_dir = tempdir_in(new_home.tmp_dir()).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::CreateTempDir {
             in_dir: new_home.tmp_dir().to_owned(),
-        })?;
+        })
+    })?;
     let node_installs = read_dir_eager(old_home.node_image_root_dir())
-        .with_context(|| ErrorKind::ReadDirError {
-            dir: old_home.node_image_root_dir().to_owned(),
+        .with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::ReadDir {
+                dir: old_home.node_image_root_dir().to_owned(),
+            })
         })?
         .filter_map(|(entry, metadata)| {
             if metadata.is_dir() {

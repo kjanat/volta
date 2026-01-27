@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use super::{content_length, ensure_containing_dir_exists, Archive, ArchiveError, Origin};
+use super::{Archive, ArchiveError, Origin, content_length, ensure_containing_dir_exists};
 use flate2::read::GzDecoder;
 use progress_read::ProgressRead;
 use tee::TeeReader;

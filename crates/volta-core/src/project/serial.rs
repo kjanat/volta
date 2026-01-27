@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::fs::{read_to_string, File};
+use std::fs::{File, read_to_string};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use super::PartialPlatform;
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::version::parse;
 use dunce::canonicalize;
 use nodejs_semver::Version;
@@ -118,20 +118,24 @@ pub(super) fn update_manifest(
     }
 
     let indent = detect_indent::detect_indent(&contents);
-    let mut output = File::create(file).with_context(|| ErrorKind::PackageWriteError {
-        file: file.to_owned(),
+    let mut output = File::create(file).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::WritePackage {
+            file: file.to_owned(),
+        })
     })?;
     let formatter = serde_json::ser::PrettyFormatter::with_indent(indent.indent().as_bytes());
     let mut ser = serde_json::Serializer::with_formatter(&output, formatter);
-    manifest
-        .serialize(&mut ser)
-        .with_context(|| ErrorKind::PackageWriteError {
+    manifest.serialize(&mut ser).with_context(|| {
+        ErrorKind::Filesystem(FilesystemError::WritePackage {
             file: file.to_owned(),
-        })?;
+        })
+    })?;
 
     if contents.ends_with('\n') {
-        writeln!(output).with_context(|| ErrorKind::PackageWriteError {
-            file: file.to_owned(),
+        writeln!(output).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::WritePackage {
+                file: file.to_owned(),
+            })
         })?;
     }
 

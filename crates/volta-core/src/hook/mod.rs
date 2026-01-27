@@ -6,7 +6,7 @@ use std::iter::once;
 use std::marker::PhantomData;
 use std::path::Path;
 
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
 use crate::layout::volta_home;
 use crate::project::Project;
 use crate::tool::{Node, Npm, Pnpm, Tool};
@@ -200,8 +200,10 @@ impl HookConfig {
             return Ok(None);
         }
 
-        let file = File::open(file_path).with_context(|| ErrorKind::ReadHooksError {
-            file: file_path.to_path_buf(),
+        let file = File::open(file_path).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::ReadHooks {
+                file: file_path.to_path_buf(),
+            })
         })?;
 
         let raw: serial::RawHookConfig =
@@ -265,7 +267,7 @@ impl EventHooks {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{tool, HookConfig, Publish, RegistryFormat};
+    use super::{HookConfig, Publish, RegistryFormat, tool};
     use std::path::PathBuf;
 
     fn fixture_path(fixture_dir: &str) -> PathBuf {

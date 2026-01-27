@@ -5,7 +5,7 @@ use crate::error::{ErrorKind, Fallible};
 use crate::version::{Tag, VersionSpec};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use validate_npm_package_name::{validate, Validity};
+use validate_npm_package_name::{Validity, validate};
 
 static TOOL_SPEC_PATTERN: Lazy<Regex> = Lazy::new(|| {
     Regex::new("^(?P<name>(?:@([^/]+?)[/])?([^/]+?))(@(?P<version>.+))?$").expect("regex is valid")

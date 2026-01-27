@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::empty::Empty;
 use crate::v2::V2;
 use log::{debug, warn};
-use volta_core::error::{Context, ErrorKind, Fallible, VoltaError};
+use volta_core::error::{Context, ErrorKind, Fallible, FilesystemError, VoltaError};
 use volta_core::fs::{remove_dir_if_exists, remove_file_if_exists};
 use volta_core::platform::PlatformSpec;
 use volta_core::session::Session;
@@ -37,8 +37,10 @@ impl V3 {
     /// accidentally mark an incomplete migration as completed
     fn complete_migration(home: v3::VoltaHome) -> Fallible<Self> {
         debug!("Writing layout marker file");
-        File::create(home.layout_file()).with_context(|| ErrorKind::CreateLayoutFileError {
-            file: home.layout_file().to_owned(),
+        File::create(home.layout_file()).with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateLayoutFile {
+                file: home.layout_file().to_owned(),
+            })
         })?;
 
         Ok(Self { home })
@@ -52,8 +54,10 @@ impl TryFrom<Empty> for V3 {
         debug!("New Volta installation detected, creating fresh layout");
 
         let home = v3::VoltaHome::new(old.home);
-        home.create().with_context(|| ErrorKind::CreateDirError {
-            dir: home.root().to_owned(),
+        home.create().with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateDir {
+                dir: home.root().to_owned(),
+            })
         })?;
 
         Self::complete_migration(home)
@@ -67,11 +71,11 @@ impl TryFrom<V2> for V3 {
         debug!("Migrating from V2 layout");
 
         let new_home = v3::VoltaHome::new(old.home.root().to_owned());
-        new_home
-            .create()
-            .with_context(|| ErrorKind::CreateDirError {
+        new_home.create().with_context(|| {
+            ErrorKind::Filesystem(FilesystemError::CreateDir {
                 dir: new_home.root().to_owned(),
-            })?;
+            })
+        })?;
 
         // Migrate installed packages to the new workflow
         migrate_packages(&old.home)?;

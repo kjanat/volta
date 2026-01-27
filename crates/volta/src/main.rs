@@ -5,11 +5,11 @@ mod cli;
 use clap::Parser;
 
 use volta_core::error::report_error;
-use volta_core::log::{Context, Verbosity, Logger};
+use volta_core::log::{Context, Logger, Verbosity};
 use volta_core::session::{ActivityKind, Session};
 
 mod common;
-use common::{ensure_layout, Error};
+use common::{Error, ensure_layout};
 
 /// The entry point for the `volta` CLI.
 pub fn main() {
