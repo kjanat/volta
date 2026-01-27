@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Tool;
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PlatformError};
 use crate::fs::{ensure_containing_dir_exists, remove_dir_if_exists, rename, symlink_dir};
 use crate::layout::volta_home;
 use crate::platform::{PlatformSpec, RuntimeImage};
@@ -89,7 +89,7 @@ impl Tool for Package {
         let default_image = session
             .default_platform()?
             .map(PlatformSpec::as_default)
-            .ok_or(ErrorKind::NoPlatform)?
+            .ok_or(ErrorKind::Platform(PlatformError::NoPlatform))?
             .checkout(session)?;
 
         self.run_install(&default_image)?;

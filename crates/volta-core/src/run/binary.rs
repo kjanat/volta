@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use super::executor::{Executor, ToolCommand, ToolKind};
 use super::{debug_active_image, debug_no_platform};
-use crate::error::{BinaryError, Context, ErrorKind, Fallible};
+use crate::error::{BinaryError, Context, ErrorKind, Fallible, PlatformError};
 use crate::layout::volta_home;
 use crate::platform::{Platform, Sourced, System};
 use crate::session::Session;
@@ -89,7 +89,7 @@ pub(super) fn local_execution_context(
         let path = System::path()?;
         debug_no_platform();
 
-        Ok((path, ErrorKind::NoPlatform))
+        Ok((path, ErrorKind::Platform(PlatformError::NoPlatform)))
     }
 }
 

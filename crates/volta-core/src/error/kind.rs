@@ -6,6 +6,7 @@ use super::binary::BinaryError;
 use super::filesystem::FilesystemError;
 use super::hook::HookError;
 use super::network::NetworkError;
+use super::platform::PlatformError;
 use super::shim::ShimError;
 use super::version::VersionError;
 use crate::style::{text_width, tool_version};
@@ -39,6 +40,9 @@ pub enum ErrorKind {
 
     /// Wrapper for version-related errors.
     Version(VersionError),
+
+    /// Wrapper for platform-related errors.
+    Platform(PlatformError),
 
     /// Thrown when building the virtual environment path fails
     BuildPathError,
@@ -117,11 +121,6 @@ pub enum ErrorKind {
     /// Thrown when Yarn is not set at the command-line
     NoCommandLineYarn,
 
-    /// Thrown when a user tries to install a Yarn or npm version before installing a Node version.
-    NoDefaultNodeVersion {
-        tool: String,
-    },
-
     NoHomeEnvironmentVar,
 
     /// Thrown when the install dir could not be determined
@@ -129,37 +128,11 @@ pub enum ErrorKind {
 
     NoLocalDataDir,
 
-    /// Thrown when a user tries to pin a npm, pnpm, or Yarn version before pinning a Node version.
-    NoPinnedNodeVersion {
-        tool: String,
-    },
-
-    /// Thrown when the platform (Node version) could not be determined
-    NoPlatform,
-
-    /// Thrown when parsing the project manifest and there is a `"volta"` key without Node
-    NoProjectNodeInManifest,
-
-    /// Thrown when Yarn is not set in a project
-    NoProjectYarn,
-
-    /// Thrown when pnpm is not set in a project
-    NoProjectPnpm,
-
     /// Thrown when no shell profiles could be found
     NoShellProfile {
         env_profile: String,
         bin_dir: PathBuf,
     },
-
-    /// Thrown when the user tries to pin Node or Yarn versions outside of a package.
-    NotInPackage,
-
-    /// Thrown when default Yarn is not set
-    NoDefaultYarn,
-
-    /// Thrown when default pnpm is not set
-    NoDefaultPnpm,
 
     /// Thrown when `npm link` is called with a package that isn't available
     NpmLinkMissingPackage {
@@ -219,9 +192,6 @@ pub enum ErrorKind {
 
     /// Thrown when unable to parse a package configuration
     ParsePackageConfigError,
-
-    /// Thrown when unable to parse the platform.json file
-    ParsePlatformError,
 
     /// Thrown when unable to parse a tool spec (`<tool>[@<version>]`)
     ParseToolSpecError {
@@ -286,6 +256,7 @@ impl fmt::Display for ErrorKind {
             Self::Filesystem(e) => e.fmt(f),
             Self::Hook(e) => e.fmt(f),
             Self::Network(e) => e.fmt(f),
+            Self::Platform(e) => e.fmt(f),
             Self::Shim(e) => e.fmt(f),
             Self::Version(e) => e.fmt(f),
             Self::BuildPathError => write!(
@@ -456,12 +427,6 @@ Use `volta run --pnpm` to select a version (see `volta help run` for more info).
 
 Use `volta run --yarn` to select a version (see `volta help run` for more info)."
             ),
-            Self::NoDefaultNodeVersion { tool } => write!(
-                f,
-                "Cannot install {tool} because the default Node version is not set.
-
-Use `volta install node` to select a default Node first, then install a {tool} version."
-            ),
             Self::NoHomeEnvironmentVar => write!(
                 f,
                 "Could not determine home directory.
@@ -480,36 +445,6 @@ Please ensure Volta was installed correctly"
 
 Please ensure the directory is available."
             ),
-            Self::NoPinnedNodeVersion { tool } => write!(
-                f,
-                "Cannot pin {tool} because the Node version is not pinned in this project.
-
-Use `volta pin node` to pin Node first, then pin a {tool} version."
-            ),
-            Self::NoPlatform => write!(
-                f,
-                "Node is not available.
-
-To run any Node command, first set a default version using `volta install node`"
-            ),
-            Self::NoProjectNodeInManifest => write!(
-                f,
-                "No Node version found in this project.
-
-Use `volta pin node` to select a version (see `volta help pin` for more info)."
-            ),
-            Self::NoProjectPnpm => write!(
-                f,
-                "No pnpm version found in this project.
-
-Use `volta pin pnpm` to select a version (see `volta help pin` for more info)."
-            ),
-            Self::NoProjectYarn => write!(
-                f,
-                "No Yarn version found in this project.
-
-Use `volta pin yarn` to select a version (see `volta help pin` for more info)."
-            ),
             Self::NoShellProfile { env_profile, bin_dir } => write!(
                 f,
                 "Could not locate user profile.
@@ -517,24 +452,6 @@ Tried $PROFILE ({}), ~/.bashrc, ~/.bash_profile, ~/.zshenv ~/.zshrc, ~/.profile,
 
 Please create one of these and try again; or you can edit your profile manually to add '{}' to your PATH",
                 env_profile, bin_dir.display()
-            ),
-            Self::NotInPackage => write!(
-                f,
-                "Not in a node package.
-
-Use `volta install` to select a default version of a tool."
-            ),
-            Self::NoDefaultPnpm => write!(
-                f,
-                "pnpm is not available.
-
-Use `volta install pnpm` to select a default version (see `volta help install` for more info)."
-            ),
-            Self::NoDefaultYarn => write!(
-                f,
-                "Yarn is not available.
-
-Use `volta install yarn` to select a default version (see `volta help install` for more info)."
             ),
             Self::NpmLinkMissingPackage { package } => write!(
                 f,
@@ -624,12 +541,6 @@ Please ensure the version of Node is correct."
 
 {REPORT_BUG_CTA}"
             ),
-            Self::ParsePlatformError => write!(
-                f,
-                "Could not parse platform settings file.
-
-{REPORT_BUG_CTA}"
-            ),
             Self::ParseToolSpecError { tool_spec } => write!(
                 f,
                 "Could not parse tool spec `{tool_spec}`
@@ -715,6 +626,12 @@ To upgrade it, please use the command `{command} {package}`"
     }
 }
 
+impl From<PlatformError> for ErrorKind {
+    fn from(error: PlatformError) -> Self {
+        Self::Platform(error)
+    }
+}
+
 impl ErrorKind {
     #[must_use]
     pub const fn exit_code(&self) -> ExitCode {
@@ -724,6 +641,7 @@ impl ErrorKind {
             Self::Filesystem(e) => e.exit_code(),
             Self::Hook(e) => e.exit_code(),
             Self::Network(e) => e.exit_code(),
+            Self::Platform(e) => e.exit_code(),
             Self::Shim(e) => e.exit_code(),
             Self::Version(e) => e.exit_code(),
 
@@ -731,21 +649,11 @@ impl ErrorKind {
             Self::ExtensionCycleError { .. }
             | Self::NoCommandLinePnpm
             | Self::NoCommandLineYarn
-            | Self::NoDefaultNodeVersion { .. }
-            | Self::NoDefaultPnpm
-            | Self::NoDefaultYarn
-            | Self::NoPinnedNodeVersion { .. }
-            | Self::NoPlatform
-            | Self::NoProjectNodeInManifest
-            | Self::NoProjectPnpm
-            | Self::NoProjectYarn
-            | Self::NotInPackage
             | Self::NpmLinkMissingPackage { .. }
             | Self::NpmLinkWrongManager { .. }
             | Self::PackageManifestParseError { .. }
             | Self::PackageParseError { .. }
             | Self::PackageUnpackError
-            | Self::ParsePlatformError
             | Self::UpgradePackageNotFound { .. }
             | Self::UpgradePackageWrongManager { .. } => ExitCode::ConfigurationError,
 

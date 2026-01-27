@@ -5,7 +5,7 @@ use super::{
     FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
     info_installed, info_pinned, info_project_version,
 };
-use crate::error::{Context, ErrorKind, Fallible, VersionError};
+use crate::error::{Context, ErrorKind, Fallible, PlatformError, VersionError};
 use crate::inventory::npm_available;
 use crate::session::Session;
 use crate::style::{success_prefix, tool_version};
@@ -87,7 +87,7 @@ impl Tool for Npm {
             info_pinned(self);
             Ok(())
         } else {
-            Err(ErrorKind::NotInPackage.into())
+            Err(ErrorKind::Platform(PlatformError::NotInPackage).into())
         }
     }
 }
@@ -169,7 +169,7 @@ impl Tool for Bundled {
 
                 Ok(())
             }
-            None => Err(ErrorKind::NotInPackage.into()),
+            None => Err(ErrorKind::Platform(PlatformError::NotInPackage).into()),
         }
     }
 }

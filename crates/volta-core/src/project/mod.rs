@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use nodejs_semver::Version;
 use once_cell::unsync::OnceCell;
 
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError, VoltaError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PlatformError, VoltaError};
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
 use crate::tool::BinConfig;
@@ -242,7 +242,7 @@ impl Project {
 
             Ok(())
         } else {
-            Err(ErrorKind::NoPinnedNodeVersion { tool: "npm".into() }.into())
+            Err(ErrorKind::Platform(PlatformError::NoPinnedNode { tool: "npm".into() }).into())
         }
     }
 
@@ -259,9 +259,9 @@ impl Project {
 
             Ok(())
         } else {
-            Err(ErrorKind::NoPinnedNodeVersion {
+            Err(ErrorKind::Platform(PlatformError::NoPinnedNode {
                 tool: "pnpm".into(),
-            }
+            })
             .into())
         }
     }
@@ -279,9 +279,9 @@ impl Project {
 
             Ok(())
         } else {
-            Err(ErrorKind::NoPinnedNodeVersion {
+            Err(ErrorKind::Platform(PlatformError::NoPinnedNode {
                 tool: "Yarn".into(),
-            }
+            })
             .into())
         }
     }
@@ -336,7 +336,9 @@ impl TryFrom<PartialPlatform> for PlatformSpec {
     type Error = VoltaError;
 
     fn try_from(partial: PartialPlatform) -> Fallible<Self> {
-        let node = partial.node.ok_or(ErrorKind::NoProjectNodeInManifest)?;
+        let node = partial
+            .node
+            .ok_or(ErrorKind::Platform(PlatformError::NoProjectNode))?;
 
         Ok(Self {
             node,

@@ -4,7 +4,7 @@ use super::{
     FetchStatus, Tool, check_fetched, check_shim_reachable, debug_already_fetched, info_fetched,
     info_installed, info_pinned, info_project_version,
 };
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{ErrorKind, Fallible, PlatformError};
 use crate::inventory::yarn_available;
 use crate::session::Session;
 use crate::style::tool_version;
@@ -86,7 +86,7 @@ impl Tool for Yarn {
             info_pinned(self);
             Ok(())
         } else {
-            Err(ErrorKind::NotInPackage.into())
+            Err(ErrorKind::Platform(PlatformError::NotInPackage).into())
         }
     }
 }

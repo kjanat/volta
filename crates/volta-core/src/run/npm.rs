@@ -5,7 +5,7 @@ use std::fs::File;
 use super::executor::{Executor, ToolCommand, ToolKind, UninstallCommand};
 use super::parser::{CommandArg, InterceptedCommand};
 use super::{RECURSION_ENV_VAR, debug_active_image, debug_no_platform};
-use crate::error::{BinaryError, ErrorKind, Fallible};
+use crate::error::{BinaryError, ErrorKind, Fallible, PlatformError};
 use crate::platform::{Platform, System};
 use crate::session::{ActivityKind, Session};
 use crate::tool::{PackageManifest, ToolSpec};
@@ -80,7 +80,7 @@ pub(super) fn execution_context(
     } else {
         let path = System::path()?;
         debug_no_platform();
-        Ok((path, ErrorKind::NoPlatform))
+        Ok((path, ErrorKind::Platform(PlatformError::NoPlatform)))
     }
 }
 

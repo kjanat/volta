@@ -1,7 +1,7 @@
 use nodejs_semver::Version;
 use std::fmt::{self, Display};
 
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{ErrorKind, Fallible, PlatformError};
 use crate::inventory::pnpm_available;
 use crate::session::Session;
 use crate::style::tool_version;
@@ -88,7 +88,7 @@ impl Tool for Pnpm {
             info_pinned(self);
             Ok(())
         } else {
-            Err(ErrorKind::NotInPackage.into())
+            Err(ErrorKind::Platform(PlatformError::NotInPackage).into())
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::fs::write;
 
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PlatformError};
 use crate::fs::touch;
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
@@ -119,9 +119,9 @@ impl Toolchain {
                 self.save()?;
             }
         } else if yarn.is_some() {
-            return Err(ErrorKind::NoDefaultNodeVersion {
+            return Err(ErrorKind::Platform(PlatformError::NoDefaultNode {
                 tool: "Yarn".into(),
-            }
+            })
             .into());
         }
 
@@ -140,9 +140,9 @@ impl Toolchain {
                 self.save()?;
             }
         } else if pnpm.is_some() {
-            return Err(ErrorKind::NoDefaultNodeVersion {
+            return Err(ErrorKind::Platform(PlatformError::NoDefaultNode {
                 tool: "pnpm".into(),
-            }
+            })
             .into());
         }
 
@@ -161,7 +161,9 @@ impl Toolchain {
                 self.save()?;
             }
         } else if npm.is_some() {
-            return Err(ErrorKind::NoDefaultNodeVersion { tool: "npm".into() }.into());
+            return Err(
+                ErrorKind::Platform(PlatformError::NoDefaultNode { tool: "npm".into() }).into(),
+            );
         }
 
         Ok(())

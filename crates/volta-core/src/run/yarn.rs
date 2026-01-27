@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use super::executor::{Executor, ToolCommand, ToolKind};
 use super::parser::CommandArg;
 use super::{RECURSION_ENV_VAR, debug_active_image, debug_no_platform};
-use crate::error::{BinaryError, ErrorKind, Fallible};
+use crate::error::{BinaryError, ErrorKind, Fallible, PlatformError};
 use crate::platform::{Platform, Source, System};
 use crate::session::{ActivityKind, Session};
 
@@ -56,7 +56,7 @@ pub(super) fn execution_context(
     } else {
         let path = System::path()?;
         debug_no_platform();
-        Ok((path, ErrorKind::NoPlatform))
+        Ok((path, ErrorKind::Platform(PlatformError::NoPlatform)))
     }
 }
 
@@ -64,8 +64,10 @@ fn validate_platform_yarn(platform: &Platform) -> Fallible<()> {
     match &platform.yarn {
         Some(_) => Ok(()),
         None => match platform.node.source {
-            Source::Project => Err(ErrorKind::NoProjectYarn.into()),
-            Source::Default | Source::Binary => Err(ErrorKind::NoDefaultYarn.into()),
+            Source::Project => Err(ErrorKind::Platform(PlatformError::NoProjectYarn).into()),
+            Source::Default | Source::Binary => {
+                Err(ErrorKind::Platform(PlatformError::NoDefaultYarn).into())
+            }
             Source::CommandLine => Err(ErrorKind::NoCommandLineYarn.into()),
         },
     }

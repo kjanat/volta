@@ -1,4 +1,4 @@
-use crate::error::{Context, ErrorKind, Fallible, VoltaError};
+use crate::error::{Context, ErrorKind, Fallible, PlatformError, VoltaError};
 use crate::platform::PlatformSpec;
 use crate::version::{option_version_serde, version_serde};
 use nodejs_semver::Version;
@@ -56,7 +56,7 @@ impl TryFrom<String> for Platform {
             serde_json::de::from_str(&src)
         };
 
-        result.with_context(|| ErrorKind::ParsePlatformError)
+        result.with_context(|| ErrorKind::Platform(PlatformError::ParsePlatform))
     }
 }
 
