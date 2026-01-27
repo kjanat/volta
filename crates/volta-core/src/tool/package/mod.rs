@@ -5,14 +5,13 @@ use std::process::Command;
 
 use super::Tool;
 use crate::error::{Context, ErrorKind, Fallible};
-use crate::fs::{remove_dir_if_exists, rename, symlink_dir};
+use crate::fs::{ensure_containing_dir_exists, remove_dir_if_exists, rename, symlink_dir};
 use crate::layout::volta_home;
 use crate::platform::{Image, PlatformSpec};
 use crate::session::Session;
 use crate::style::{success_prefix, tool_version};
 use crate::sync::VoltaLock;
 use crate::version::VersionSpec;
-use fs_utils::ensure_containing_dir_exists;
 use log::info;
 use tempfile::{tempdir_in, TempDir};
 

@@ -1,6 +1,7 @@
 //! This crate provides types for fetching and unpacking compressed
 //! archives in tarball or zip format.
-use std::fs::File;
+use std::fs::{self, File};
+use std::io;
 use std::path::Path;
 
 use attohttpc::header::HeaderMap;
@@ -9,6 +10,26 @@ use thiserror::Error;
 
 mod tarball;
 mod zipfile;
+
+/// Creates the parent directory of the input path, assuming the input path is a file.
+///
+/// # Errors
+///
+/// Returns an error if the parent directory cannot be determined or created.
+fn ensure_containing_dir_exists<P: AsRef<Path>>(path: &P) -> io::Result<()> {
+    path.as_ref()
+        .parent()
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(
+                    "Could not determine directory information for {}",
+                    path.as_ref().display()
+                ),
+            )
+        })
+        .and_then(fs::create_dir_all)
+}
 
 pub use crate::tarball::Tarball;
 pub use crate::zipfile::Zip;

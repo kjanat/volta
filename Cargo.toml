@@ -51,7 +51,6 @@ unsafe_code = "deny"
 [workspace.dependencies]
 # Internal crates
 archive                   = { path = "crates/archive" }
-fs-utils                  = { path = "crates/fs-utils" }
 progress-read             = { path = "crates/progress-read" }
 test-support              = { path = "crates/test-support" }
 validate-npm-package-name = { path = "crates/validate-npm-package-name" }

@@ -22,7 +22,6 @@ detect-indent.workspace             = true
 dirs.workspace                      = true
 dunce.workspace                     = true
 envoy.workspace                     = true
-fs-utils.workspace                  = true
 fs2.workspace                       = true
 headers.workspace                   = true
 httpdate.workspace                  = true

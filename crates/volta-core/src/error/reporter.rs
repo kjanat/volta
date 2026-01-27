@@ -5,11 +5,11 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use super::VoltaError;
+use crate::fs::ensure_containing_dir_exists;
 use crate::layout::volta_home;
 use crate::style::format_error_cause;
 use chrono::Local;
 use console::strip_ansi_codes;
-use fs_utils::ensure_containing_dir_exists;
 use log::{debug, error};
 
 /// Returns true if running in a CI environment.

@@ -13,7 +13,6 @@ description          = "Archive extraction utilities for Volta"
 attohttpc.workspace     = true
 cfg-if.workspace        = true
 flate2.workspace        = true
-fs-utils.workspace      = true
 headers.workspace       = true
 log.workspace           = true
 progress-read.workspace = true
