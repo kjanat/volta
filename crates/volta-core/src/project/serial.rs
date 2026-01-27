@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use super::PartialPlatform;
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PackageError};
 use crate::version::parse;
 use dunce::canonicalize;
 use nodejs_semver::Version;
@@ -85,20 +85,23 @@ pub(super) fn update_manifest(
     key: &ManifestKey,
     value: Option<&Version>,
 ) -> Fallible<()> {
-    let contents = read_to_string(file).with_context(|| ErrorKind::PackageReadError {
-        file: file.to_owned(),
+    let contents = read_to_string(file).with_context(|| {
+        ErrorKind::Package(PackageError::ProjectManifestRead {
+            file: file.to_owned(),
+        })
     })?;
 
-    let mut manifest: serde_json::Value =
-        serde_json::from_str(&contents).with_context(|| ErrorKind::PackageParseError {
+    let mut manifest: serde_json::Value = serde_json::from_str(&contents).with_context(|| {
+        ErrorKind::Package(PackageError::ProjectManifestParse {
             file: file.to_owned(),
-        })?;
+        })
+    })?;
 
-    let root = manifest
-        .as_object_mut()
-        .ok_or_else(|| ErrorKind::PackageParseError {
+    let root = manifest.as_object_mut().ok_or_else(|| {
+        ErrorKind::Package(PackageError::ProjectManifestParse {
             file: file.to_owned(),
-        })?;
+        })
+    })?;
 
     let key = key.to_string();
 
@@ -154,12 +157,16 @@ struct RawManifest {
 
 impl RawManifest {
     fn from_file(package: &Path) -> Fallible<Self> {
-        let file = File::open(package).with_context(|| ErrorKind::PackageReadError {
-            file: package.to_owned(),
+        let file = File::open(package).with_context(|| {
+            ErrorKind::Package(PackageError::ProjectManifestRead {
+                file: package.to_owned(),
+            })
         })?;
 
-        serde_json::de::from_reader(file).with_context(|| ErrorKind::PackageParseError {
-            file: package.to_owned(),
+        serde_json::de::from_reader(file).with_context(|| {
+            ErrorKind::Package(PackageError::ProjectManifestParse {
+                file: package.to_owned(),
+            })
         })
     }
 }

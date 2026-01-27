@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::registry_fetch_error;
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, PackageError};
 use crate::fs::read_dir_eager;
 use crate::style::progress_spinner;
 use crate::version::{hashmap_version_serde, version_serde};
@@ -74,7 +74,7 @@ pub fn scoped_public_registry_package(scope: &str, package: &str, version: &str)
 /// Packages typically extract to a "package" directory, but not always
 pub fn find_unpack_dir(in_dir: &Path) -> Fallible<PathBuf> {
     let dirs: Vec<_> = read_dir_eager(in_dir)
-        .with_context(|| ErrorKind::PackageUnpackError)?
+        .with_context(|| ErrorKind::Package(PackageError::UnpackLayout))?
         .collect();
 
     // if there is only one directory, return that
@@ -84,7 +84,7 @@ pub fn find_unpack_dir(in_dir: &Path) -> Fallible<PathBuf> {
         return Ok(entry.path());
     }
     // there is more than just a single directory here, something is wrong
-    Err(ErrorKind::PackageUnpackError.into())
+    Err(ErrorKind::Package(PackageError::UnpackLayout).into())
 }
 
 /// Details about a package in the npm Registry

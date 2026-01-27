@@ -6,7 +6,7 @@ use super::executor::{
     Executor, InternalInstallCommand, PackageInstallCommand, PackageLinkCommand,
     PackageUpgradeCommand, UninstallCommand,
 };
-use crate::error::{ErrorKind, Fallible};
+use crate::error::{ErrorKind, Fallible, PackageError};
 use crate::inventory::package_configs;
 use crate::platform::{Platform, PlatformSpec};
 use crate::tool::ToolSpec;
@@ -382,10 +382,10 @@ impl UpgradeArgs<'_> {
                     executors.push(UninstallCommand::new(internal).into());
                 }
                 Err(_) => {
-                    return Err(ErrorKind::UpgradePackageNotFound {
+                    return Err(ErrorKind::Package(PackageError::UpgradeNotFound {
                         package: tool.to_string_lossy().to_string(),
                         manager: self.manager,
-                    }
+                    })
                     .into());
                 }
             }

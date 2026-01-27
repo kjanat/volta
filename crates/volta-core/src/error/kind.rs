@@ -6,11 +6,11 @@ use super::binary::BinaryError;
 use super::filesystem::FilesystemError;
 use super::hook::HookError;
 use super::network::NetworkError;
+use super::package::PackageError;
 use super::platform::PlatformError;
 use super::shim::ShimError;
 use super::version::VersionError;
 use crate::style::{text_width, tool_version};
-use crate::tool::package::PackageManager;
 use textwrap::{fill, indent};
 
 const REPORT_BUG_CTA: &str =
@@ -44,22 +44,15 @@ pub enum ErrorKind {
     /// Wrapper for platform-related errors.
     Platform(PlatformError),
 
+    /// Wrapper for package-related errors.
+    Package(PackageError),
+
     /// Thrown when building the virtual environment path fails
     BuildPathError,
 
     /// Thrown when unable to launch a command with `VOLTA_BYPASS` set
     BypassError {
         command: String,
-    },
-
-    /// Thrown when a user tries to `volta fetch` something other than node/yarn/npm.
-    CannotFetchPackage {
-        package: String,
-    },
-
-    /// Thrown when a user tries to `volta pin` something other than node/yarn/npm.
-    CannotPinPackage {
-        package: String,
     },
 
     /// Thrown when the Completions out-dir is not a directory
@@ -87,9 +80,6 @@ pub enum ErrorKind {
     ExtensionPathError {
         path: PathBuf,
     },
-
-    /// Thrown when determining the name of a newly-installed package fails
-    InstalledPackageNameError,
 
     /// Thrown when a user does e.g. `volta install node 12` instead of
     /// `volta install node@12`.
@@ -134,52 +124,9 @@ pub enum ErrorKind {
         bin_dir: PathBuf,
     },
 
-    /// Thrown when `npm link` is called with a package that isn't available
-    NpmLinkMissingPackage {
-        package: String,
-    },
-
-    /// Thrown when `npm link` is called with a package that was not installed / linked with npm
-    NpmLinkWrongManager {
-        package: String,
-    },
-
     NpxNotAvailable {
         version: String,
     },
-
-    /// Thrown when the command to install a global package is not successful
-    PackageInstallFailed {
-        package: String,
-    },
-
-    /// Thrown when parsing the package manifest fails
-    PackageManifestParseError {
-        package: String,
-    },
-
-    /// Thrown when reading the package manifest fails
-    PackageManifestReadError {
-        package: String,
-    },
-
-    /// Thrown when a specified package could not be found on the npm registry
-    PackageNotFound {
-        package: String,
-    },
-
-    /// Thrown when parsing a package manifest fails
-    PackageParseError {
-        file: PathBuf,
-    },
-
-    /// Thrown when reading a package manifest fails
-    PackageReadError {
-        file: PathBuf,
-    },
-
-    /// Thrown when a package has been unpacked but is not formed correctly.
-    PackageUnpackError,
 
     /// Thrown when unable to parse the node index cache
     ParseNodeIndexCacheError,
@@ -189,9 +136,6 @@ pub enum ErrorKind {
 
     /// Thrown when unable to parse the npm manifest file from a node install
     ParseNpmManifestError,
-
-    /// Thrown when unable to parse a package configuration
-    ParsePackageConfigError,
 
     /// Thrown when unable to parse a tool spec (`<tool>[@<version>]`)
     ParseToolSpecError {
@@ -234,18 +178,6 @@ pub enum ErrorKind {
         tool: String,
         version: String,
     },
-
-    /// Thrown when a package to upgrade was not found
-    UpgradePackageNotFound {
-        package: String,
-        manager: PackageManager,
-    },
-
-    /// Thrown when a package to upgrade was installed with a different package manager
-    UpgradePackageWrongManager {
-        package: String,
-        manager: PackageManager,
-    },
 }
 
 impl fmt::Display for ErrorKind {
@@ -257,6 +189,7 @@ impl fmt::Display for ErrorKind {
             Self::Hook(e) => e.fmt(f),
             Self::Network(e) => e.fmt(f),
             Self::Platform(e) => e.fmt(f),
+            Self::Package(e) => e.fmt(f),
             Self::Shim(e) => e.fmt(f),
             Self::Version(e) => e.fmt(f),
             Self::BuildPathError => write!(
@@ -270,18 +203,6 @@ Please ensure your PATH is valid."
                 "Could not execute command '{command}'
 
 VOLTA_BYPASS is enabled, please ensure that the command exists on your system or unset VOLTA_BYPASS",
-            ),
-            Self::CannotFetchPackage { package } => write!(
-                f,
-                "Fetching packages without installing them is not supported.
-
-Use `volta install {package}` to update the default version."
-            ),
-            Self::CannotPinPackage { package } => write!(
-                f,
-                "Only node and yarn can be pinned in a project
-
-Use `npm install` or `yarn add` to select a version of {package} for this project."
             ),
             Self::CompletionsOutFileError { path } => write!(
                 f,
@@ -336,12 +257,6 @@ Please ensure you have 'volta-migrate' on your PATH and run it directly."
 
 Please ensure that the file exists and is accessible.",
                 path.display(),
-            ),
-            Self::InstalledPackageNameError => write!(
-                f,
-                "Could not determine the name of the package that was just installed.
-
-{REPORT_BUG_CTA}"
             ),
             Self::InvalidInvocation {
                 action,
@@ -453,69 +368,11 @@ Tried $PROFILE ({}), ~/.bashrc, ~/.bash_profile, ~/.zshenv ~/.zshrc, ~/.profile,
 Please create one of these and try again; or you can edit your profile manually to add '{}' to your PATH",
                 env_profile, bin_dir.display()
             ),
-            Self::NpmLinkMissingPackage { package } => write!(
-                f,
-                "Could not locate the package '{package}'
-
-Please ensure it is available by running `npm link` in its source directory."
-            ),
-            Self::NpmLinkWrongManager { package } => write!(
-                f,
-                "The package '{package}' was not installed using npm and cannot be linked with `npm link`
-
-Please ensure it is linked with `npm link` or installed with `npm i -g {package}`."
-            ),
             Self::NpxNotAvailable { version } => write!(
                 f,
                 "'npx' is only available with npm >= 5.2.0
 
 This project is configured to use version {version} of npm."
-            ),
-            Self::PackageInstallFailed { package } => write!(
-                f,
-                "Could not install package '{package}'
-
-Please confirm the package is valid and run with `--verbose` for more diagnostics."
-            ),
-            Self::PackageManifestParseError { package } => write!(
-                f,
-                "Could not parse package.json manifest for {package}
-
-Please ensure the package includes a valid manifest file."
-            ),
-            Self::PackageManifestReadError { package } => write!(
-                f,
-                "Could not read package.json manifest for {package}
-
-Please ensure the package includes a valid manifest file."
-            ),
-            Self::PackageNotFound { package } => write!(
-                f,
-                "Could not find '{package}' in the package registry.
-
-Please verify the requested package is correct."
-            ),
-            Self::PackageParseError { file } => write!(
-                f,
-                "Could not parse project manifest
-at {}
-
-Please ensure that the file is correctly formatted.",
-                file.display()
-            ),
-            Self::PackageReadError { file } => write!(
-                f,
-                "Could not read project manifest
-from {}
-
-Please ensure that the file exists.",
-                file.display()
-            ),
-            Self::PackageUnpackError => write!(
-                f,
-                "Could not determine package directory layout.
-
-Please ensure the package is correctly formatted."
             ),
             Self::ParseNodeIndexCacheError => write!(
                 f,
@@ -534,12 +391,6 @@ Please ensure the package is correctly formatted."
                 "Could not parse package.json file for bundled npm.
 
 Please ensure the version of Node is correct."
-            ),
-            Self::ParsePackageConfigError => write!(
-                f,
-                "Could not parse package configuration file.
-
-{REPORT_BUG_CTA}"
             ),
             Self::ParseToolSpecError { tool_spec } => write!(
                 f,
@@ -597,31 +448,6 @@ at {}
 
 Please ensure the correct version is specified."
             ),
-            Self::UpgradePackageNotFound { package, manager } => write!(
-                f,
-                r"Could not locate the package '{}' to upgrade.
-
-Please ensure it is installed with `{} {0}`",
-                package,
-                match manager {
-                    PackageManager::Npm => "npm i -g",
-                    PackageManager::Pnpm => "pnpm add -g",
-                    PackageManager::Yarn => "yarn global add",
-                }
-            ),
-            Self::UpgradePackageWrongManager { package, manager } => {
-                let (name, command) = match manager {
-                    PackageManager::Npm => ("npm", "npm update -g"),
-                    PackageManager::Pnpm => ("pnpm", "pnpm update -g"),
-                    PackageManager::Yarn => ("Yarn", "yarn global upgrade"),
-                };
-                write!(
-                    f,
-                    r"The package '{package}' was installed using {name}.
-
-To upgrade it, please use the command `{command} {package}`"
-                )
-            }
         }
     }
 }
@@ -629,6 +455,12 @@ To upgrade it, please use the command `{command} {package}`"
 impl From<PlatformError> for ErrorKind {
     fn from(error: PlatformError) -> Self {
         Self::Platform(error)
+    }
+}
+
+impl From<PackageError> for ErrorKind {
+    fn from(error: PackageError) -> Self {
+        Self::Package(error)
     }
 }
 
@@ -641,6 +473,7 @@ impl ErrorKind {
             Self::Filesystem(e) => e.exit_code(),
             Self::Hook(e) => e.exit_code(),
             Self::Network(e) => e.exit_code(),
+            Self::Package(e) => e.exit_code(),
             Self::Platform(e) => e.exit_code(),
             Self::Shim(e) => e.exit_code(),
             Self::Version(e) => e.exit_code(),
@@ -648,14 +481,7 @@ impl ErrorKind {
             // ConfigurationError
             Self::ExtensionCycleError { .. }
             | Self::NoCommandLinePnpm
-            | Self::NoCommandLineYarn
-            | Self::NpmLinkMissingPackage { .. }
-            | Self::NpmLinkWrongManager { .. }
-            | Self::PackageManifestParseError { .. }
-            | Self::PackageParseError { .. }
-            | Self::PackageUnpackError
-            | Self::UpgradePackageNotFound { .. }
-            | Self::UpgradePackageWrongManager { .. } => ExitCode::ConfigurationError,
+            | Self::NoCommandLineYarn => ExitCode::ConfigurationError,
 
             // EnvironmentError
             Self::BuildPathError
@@ -674,31 +500,23 @@ impl ErrorKind {
             // FileSystemError
             Self::ExtensionPathError { .. }
             | Self::LockAcquireError
-            | Self::PackageManifestReadError { .. }
-            | Self::PackageReadError { .. }
             | Self::PersistInventoryError { .. }
             | Self::SetupToolImageError { .. }
             | Self::SetToolExecutable { .. } => ExitCode::FileSystemError,
 
             // InvalidArguments
-            Self::CannotFetchPackage { .. }
-            | Self::CannotPinPackage { .. }
-            | Self::CompletionsOutFileError { .. }
+            Self::CompletionsOutFileError { .. }
             | Self::DeprecatedCommandError { .. }
             | Self::InvalidInvocation { .. }
             | Self::InvalidInvocationOfBareVersion { .. }
             | Self::InvalidToolName { .. }
-            | Self::PackageNotFound { .. }
             | Self::ParseToolSpecError { .. } => ExitCode::InvalidArguments,
 
             // UnknownError
             Self::CouldNotDetermineTool
-            | Self::InstalledPackageNameError
-            | Self::PackageInstallFailed { .. }
             | Self::ParseNodeIndexCacheError
             | Self::ParseNodeIndexExpiryError
             | Self::ParseNpmManifestError
-            | Self::ParsePackageConfigError
             | Self::StringifyBinConfigError
             | Self::StringifyPackageConfigError
             | Self::StringifyPlatformError

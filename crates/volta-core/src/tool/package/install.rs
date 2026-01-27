@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use super::manager::PackageManager;
 use crate::command::create_command;
-use crate::error::{Context, ErrorKind, Fallible};
+use crate::error::{Context, ErrorKind, Fallible, PackageError};
 use crate::platform::RuntimeImage;
 use crate::style::progress_spinner;
 use log::debug;
@@ -31,11 +31,11 @@ pub(super) fn run_global_install(
 
     debug!("Installing {package} with command: {command:?}");
     let spinner = progress_spinner(format!("Installing {package}"));
-    let output_result = command
-        .output()
-        .with_context(|| ErrorKind::PackageInstallFailed {
+    let output_result = command.output().with_context(|| {
+        ErrorKind::Package(PackageError::InstallFailed {
             package: package.clone(),
-        });
+        })
+    });
     spinner.finish_and_clear();
     let output = output_result?;
 
@@ -51,8 +51,8 @@ pub(super) fn run_global_install(
     } else if stderr.contains("code E404") {
         // npm outputs "code E404" as part of the error output when a package couldn't be found
         // Detect that and show a nicer error message (since we likely know the problem in that case)
-        Err(ErrorKind::PackageNotFound { package }.into())
+        Err(ErrorKind::Package(PackageError::NotFound { package }).into())
     } else {
-        Err(ErrorKind::PackageInstallFailed { package }.into())
+        Err(ErrorKind::Package(PackageError::InstallFailed { package }).into())
     }
 }

@@ -8,7 +8,7 @@ use std::process::{Command, ExitStatus};
 
 use super::RECURSION_ENV_VAR;
 use crate::command::create_command;
-use crate::error::{BinaryError, Context, ErrorKind, Fallible};
+use crate::error::{BinaryError, Context, ErrorKind, Fallible, PackageError};
 use crate::layout::volta_home;
 use crate::platform::{Overrides, Platform, System};
 use crate::session::Session;
@@ -373,14 +373,16 @@ impl PackageLinkCommand {
     fn check_linked_package(&self, session: &Session) -> Fallible<()> {
         let config =
             PackageConfig::from_file(volta_home()?.default_package_config_file(&self.tool))
-                .with_context(|| ErrorKind::NpmLinkMissingPackage {
-                    package: self.tool.clone(),
+                .with_context(|| {
+                    ErrorKind::Package(PackageError::LinkMissing {
+                        package: self.tool.clone(),
+                    })
                 })?;
 
         if config.manager != PackageManager::Npm {
-            return Err(ErrorKind::NpmLinkWrongManager {
+            return Err(ErrorKind::Package(PackageError::LinkWrongManager {
                 package: self.tool.clone(),
-            }
+            })
             .into());
         }
 

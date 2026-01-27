@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Tool;
-use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PlatformError};
+use crate::error::{Context, ErrorKind, Fallible, FilesystemError, PackageError, PlatformError};
 use crate::fs::{ensure_containing_dir_exists, remove_dir_if_exists, rename, symlink_dir};
 use crate::layout::volta_home;
 use crate::platform::{PlatformSpec, RuntimeImage};
@@ -77,9 +77,9 @@ impl Package {
 
 impl Tool for Package {
     fn fetch(self: Box<Self>, _session: &mut Session) -> Fallible<()> {
-        Err(ErrorKind::CannotFetchPackage {
+        Err(ErrorKind::Package(PackageError::FetchNotSupported {
             package: self.to_string(),
-        }
+        })
         .into())
     }
 
@@ -116,7 +116,7 @@ impl Tool for Package {
     }
 
     fn pin(self: Box<Self>, _session: &mut Session) -> Fallible<()> {
-        Err(ErrorKind::CannotPinPackage { package: self.name }.into())
+        Err(ErrorKind::Package(PackageError::PinNotSupported { package: self.name }).into())
     }
 }
 
@@ -186,7 +186,7 @@ impl DirectInstall {
 
         let name = name
             .or_else(|| manager.get_installed_package(staging.path().to_owned()))
-            .ok_or(ErrorKind::InstalledPackageNameError)?;
+            .ok_or(ErrorKind::Package(PackageError::InstalledNameUnknown))?;
         let manifest = configure::parse_manifest(&name, staging.path().to_owned(), manager)?;
 
         persist_install(&name, &manifest.version, staging.path())?;
@@ -228,18 +228,20 @@ impl InPlaceUpgrade {
     pub fn check_upgraded_package(&self) -> Fallible<()> {
         let config =
             PackageConfig::from_file(volta_home()?.default_package_config_file(&self.package))
-                .with_context(|| ErrorKind::UpgradePackageNotFound {
-                    package: self.package.clone(),
-                    manager: self.manager,
+                .with_context(|| {
+                    ErrorKind::Package(PackageError::UpgradeNotFound {
+                        package: self.package.clone(),
+                        manager: self.manager,
+                    })
                 })?;
 
         if config.manager == self.manager {
             Ok(())
         } else {
-            Err(ErrorKind::UpgradePackageWrongManager {
+            Err(ErrorKind::Package(PackageError::UpgradeWrongManager {
                 package: self.package.clone(),
                 manager: config.manager,
-            }
+            })
             .into())
         }
     }

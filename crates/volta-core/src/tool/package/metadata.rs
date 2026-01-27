@@ -4,7 +4,9 @@ use std::io;
 use std::path::Path;
 
 use super::manager::PackageManager;
-use crate::error::{BinaryError, Context, ErrorKind, Fallible, FilesystemError, VoltaError};
+use crate::error::{
+    BinaryError, Context, ErrorKind, Fallible, FilesystemError, PackageError, VoltaError,
+};
 use crate::fs::ensure_containing_dir_exists;
 use crate::layout::volta_home;
 use crate::platform::PlatformSpec;
@@ -45,7 +47,8 @@ impl PackageConfig {
                 file: file.as_ref().to_owned(),
             })
         })?;
-        serde_json::from_reader(config).with_context(|| ErrorKind::ParsePackageConfigError)
+        serde_json::from_reader(config)
+            .with_context(|| ErrorKind::Package(PackageError::ConfigParse))
     }
 
     /// # Errors
@@ -69,7 +72,7 @@ impl PackageConfig {
                 }
             }
             Ok(config) => serde_json::from_reader(config)
-                .with_context(|| ErrorKind::ParsePackageConfigError)
+                .with_context(|| ErrorKind::Package(PackageError::ConfigParse))
                 .map(Some),
         }
     }
@@ -228,15 +231,16 @@ impl PackageManifest {
     /// Returns an error if the manifest cannot be read or parsed.
     pub fn for_dir(package: &str, package_root: &Path) -> Fallible<Self> {
         let package_file = package_root.join("package.json");
-        let file =
-            File::open(package_file).with_context(|| ErrorKind::PackageManifestReadError {
+        let file = File::open(package_file).with_context(|| {
+            ErrorKind::Package(PackageError::ManifestRead {
                 package: package.into(),
-            })?;
+            })
+        })?;
 
         let mut manifest: Self = serde_json::de::from_reader(file).with_context(|| {
-            ErrorKind::PackageManifestParseError {
+            ErrorKind::Package(PackageError::ManifestParse {
                 package: package.into(),
-            }
+            })
         })?;
 
         // If the bin list contains only an empty string, that means `bin` was a string value,
