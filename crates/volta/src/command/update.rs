@@ -194,6 +194,7 @@ impl Update {
 }
 
 /// Create a new `ToolSpec` with the given version, preserving the original variant.
+#[must_use]
 fn with_version_spec(tool: &ToolSpec, version: VersionSpec) -> ToolSpec {
     match tool {
         ToolSpec::Node(_) => ToolSpec::Node(version),
