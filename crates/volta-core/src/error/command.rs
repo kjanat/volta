@@ -139,8 +139,9 @@ Please remove the file or pass `-f` or `--force` to override.",
                 f,
                 "'{tool}' is not pinned in this project.
 
-Use `volta update --global {tool}` to update your default toolchain, or
-`volta pin {tool}` to add it to the project first."
+Only tools (node, npm, yarn, pnpm) can be pinned to a project; packages cannot.
+Use `volta update --global {tool}` to update your default, or if this is a tool,
+run `volta pin {tool}` to add it to the project first."
             ),
             Self::NotInProject => write!(
                 f,

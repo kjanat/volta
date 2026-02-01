@@ -76,8 +76,8 @@ impl Update {
             // Determine the version to update to based on constraints
             let version_spec = self.resolve_target_version(&tool, &scope, session)?;
 
-            // Create a new ToolSpec with the resolved version
-            let tool_with_version = ToolSpec::from_str_and_version(tool.name(), version_spec);
+            // Create a new ToolSpec with the resolved version, preserving the variant
+            let tool_with_version = with_version_spec(&tool, version_spec);
 
             match scope {
                 Scope::Global => {
@@ -99,6 +99,11 @@ impl Update {
     /// Returns `CommandError::NotInProject` if `--project` is specified but not in a project.
     /// Returns `CommandError::NotPinnedInProject` if the tool is not pinned in the project
     /// (either with `--project` flag or during auto-detection in a project context).
+    ///
+    /// # Panics
+    ///
+    /// Panics if both `--global` and `--project` flags are set simultaneously.
+    /// This should be prevented by clap's `conflicts_with` configuration.
     fn determine_scope(
         &self,
         tool: &ToolSpec,
@@ -155,35 +160,47 @@ impl Update {
         scope: &Scope,
         session: &Session,
     ) -> Fallible<VersionSpec> {
-        // If user specified an explicit version (e.g., node@^20), use that
-        if let Some(explicit_version) = get_explicit_version(tool) {
-            return Ok(explicit_version);
-        }
+        get_explicit_version(tool).map_or_else(
+            || {
+                // No explicit version specified, check for constraints
+                if !self.major && !self.minor && !self.patch {
+                    // No constraints, update to latest
+                    return Ok(VersionSpec::default());
+                }
 
-        // If no constraints, update to latest
-        if !self.major && !self.minor && !self.patch {
-            return Ok(VersionSpec::default());
-        }
+                // Get the current version based on scope
+                let current_version = get_current_version(tool, scope, session)?;
 
-        // Get the current version based on scope
-        let current_version = get_current_version(tool, scope, session)?;
+                // Build a semver range based on constraints
+                let range = if self.major {
+                    // ^major.0.0 - allows any version with the same major
+                    format!("^{}.0.0", current_version.major)
+                } else if self.minor {
+                    // ~major.minor.0 - allows any version with the same major.minor
+                    format!("~{}.{}.0", current_version.major, current_version.minor)
+                } else {
+                    // ~major.minor.patch - allows patch-level updates (e.g., 18.19.0 -> 18.19.1)
+                    format!(
+                        "~{}.{}.{}",
+                        current_version.major, current_version.minor, current_version.patch
+                    )
+                };
 
-        // Build a semver range based on constraints
-        let range = if self.major {
-            // ^major.0.0 - allows any version with the same major
-            format!("^{}.0.0", current_version.major)
-        } else if self.minor {
-            // ~major.minor.0 - allows any version with the same major.minor
-            format!("~{}.{}.0", current_version.major, current_version.minor)
-        } else {
-            // ~major.minor.patch - allows patch-level updates (e.g., 18.19.0 -> 18.19.1)
-            format!(
-                "~{}.{}.{}",
-                current_version.major, current_version.minor, current_version.patch
-            )
-        };
+                range.parse()
+            },
+            Ok,
+        )
+    }
+}
 
-        range.parse()
+/// Create a new `ToolSpec` with the given version, preserving the original variant.
+fn with_version_spec(tool: &ToolSpec, version: VersionSpec) -> ToolSpec {
+    match tool {
+        ToolSpec::Node(_) => ToolSpec::Node(version),
+        ToolSpec::Npm(_) => ToolSpec::Npm(version),
+        ToolSpec::Pnpm(_) => ToolSpec::Pnpm(version),
+        ToolSpec::Yarn(_) => ToolSpec::Yarn(version),
+        ToolSpec::Package(name, _) => ToolSpec::Package(name.clone(), version),
     }
 }
 
