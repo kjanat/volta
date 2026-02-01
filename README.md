@@ -38,6 +38,10 @@ Read the [Getting Started Guide](https://docs.volta.sh/guide/getting-started) on
 
 Read the [Understanding Volta Guide](https://docs.volta.sh/guide/understanding) on our website for detailed instructions on how to use Volta.
 
+## Environment Variables
+
+Volta supports several environment variables for customizing its behavior, including `VOLTA_BYPASS` to temporarily disable shims. See [ENVIRONMENT.md](ENVIRONMENT.md) for the complete reference.
+
 ## Contributing to Volta
 
 Contributions are always welcome, no matter how large or small. Substantial feature ideas should be proposed as an [RFC](https://github.com/volta-cli/rfcs). Before contributing, please read the [code of conduct](CODE_OF_CONDUCT.md).
