@@ -14,6 +14,7 @@ enum Scope {
     Project,
 }
 
+/// Updates one or more tools to the specified or latest versions.
 #[derive(clap::Args)]
 #[allow(clippy::struct_excessive_bools)] // CLI flags are naturally bools
 pub struct Update {
@@ -74,7 +75,13 @@ impl Command for Update {
 }
 
 impl Update {
-    /// Determine the scope (global vs project) for the update operation
+    /// Determine the scope (global vs project) for the update operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CommandError::NotInProject` if `--project` is specified but not in a project.
+    /// Returns `CommandError::NotPinnedInProject` if the tool is not pinned in the project
+    /// (either with `--project` flag or during auto-detection in a project context).
     fn determine_scope(
         &self,
         tool: &ToolSpec,
@@ -116,7 +123,13 @@ impl Update {
         }
     }
 
-    /// Resolve the target version based on constraints (--major, --minor, --patch)
+    /// Resolve the target version based on constraints (--major, --minor, --patch).
+    ///
+    /// # Errors
+    ///
+    /// Returns `CommandError::NoCurrentVersion` if a version constraint is specified
+    /// but no current version is installed for the tool.
+    /// Propagates session errors from platform lookup and version parse errors.
     fn resolve_target_version(
         &self,
         tool: &ToolSpec,
@@ -144,16 +157,10 @@ impl Update {
             // ~major.minor.0 - allows any version with the same major.minor
             format!("~{}.{}.0", current_version.major, current_version.minor)
         } else {
-            // patch constraint: major.minor.patch - only newer builds of same patch
-            // This is effectively the same patch, so we use a very tight range
+            // ~major.minor.patch - allows patch-level updates (e.g., 18.19.0 -> 18.19.1)
             format!(
-                ">={}.{}.{} <{}.{}.{}",
-                current_version.major,
-                current_version.minor,
-                current_version.patch,
-                current_version.major,
-                current_version.minor,
-                current_version.patch + 1
+                "~{}.{}.{}",
+                current_version.major, current_version.minor, current_version.patch
             )
         };
 
@@ -161,7 +168,8 @@ impl Update {
     }
 }
 
-/// Get explicit version if the user specified one (e.g., node@^20)
+/// Get explicit version if the user specified one (e.g., node@^20).
+#[must_use]
 fn get_explicit_version(tool: &ToolSpec) -> Option<VersionSpec> {
     let version = match tool {
         ToolSpec::Node(v)
@@ -179,7 +187,13 @@ fn get_explicit_version(tool: &ToolSpec) -> Option<VersionSpec> {
     }
 }
 
-/// Get the current installed version for the tool based on scope
+/// Get the current installed version for the tool based on scope.
+///
+/// # Errors
+///
+/// Returns `CommandError::NoCurrentVersion` if no platform is configured or if the
+/// specific tool is not installed in the platform. Propagates session errors from
+/// platform lookup.
 fn get_current_version(
     tool: &ToolSpec,
     scope: &Scope,
@@ -222,7 +236,8 @@ fn get_current_version(
     }
 }
 
-/// Check if a tool is pinned in the project
+/// Check if a tool is pinned in the project.
+#[must_use]
 const fn is_tool_pinned(tool: &ToolSpec, project_platform: Option<&PlatformSpec>) -> bool {
     let Some(platform) = project_platform else {
         return false;
