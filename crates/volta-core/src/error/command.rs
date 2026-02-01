@@ -52,6 +52,9 @@ pub enum CommandError {
 
     /// No current version installed for the tool (needed for constrained updates).
     NoCurrentVersion { tool: String },
+
+    /// Package version lookup is not supported for constrained updates.
+    PackageVersionLookupUnsupported { package: String },
 }
 
 impl fmt::Display for CommandError {
@@ -152,6 +155,14 @@ The --project flag requires being in a directory with a package.json file."
 Cannot determine version constraints without a current version.
 Use `volta update {tool}` without --major/--minor/--patch to install the latest version."
             ),
+            Self::PackageVersionLookupUnsupported { package } => write!(
+                f,
+                "Version lookup for package '{package}' is not supported.
+
+Constrained updates (--major/--minor/--patch) require looking up the current
+installed version, which is not yet implemented for global packages.
+Use `volta update {package}` without version constraints to update to latest."
+            ),
         }
     }
 }
@@ -179,6 +190,9 @@ impl CommandError {
             | Self::CompletionsOutputExists { .. }
             | Self::NotPinnedInProject { .. }
             | Self::NotInProject => ExitCode::InvalidArguments,
+
+            // Unimplemented feature
+            Self::PackageVersionLookupUnsupported { .. } => ExitCode::UnknownError,
         }
     }
 }

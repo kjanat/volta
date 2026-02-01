@@ -1,3 +1,5 @@
+use nodejs_semver::Version;
+
 use volta_core::error::{CommandError, ExitCode, Fallible};
 use volta_core::platform::PlatformSpec;
 use volta_core::session::{ActivityKind, Session};
@@ -6,11 +8,11 @@ use volta_core::version::VersionSpec;
 
 use crate::command::Command;
 
-/// Scope for the update operation
+/// Scope for the update operation.
 enum Scope {
-    /// Update global default
+    /// Update global default.
     Global,
-    /// Update project-pinned version
+    /// Update project-pinned version.
     Project,
 }
 
@@ -19,6 +21,9 @@ enum Scope {
 #[allow(clippy::struct_excessive_bools)] // CLI flags are naturally bools
 pub struct Update {
     /// Tools to update, like `node`, `yarn@latest` or `typescript`.
+    ///
+    /// Note: Version constraints (--major/--minor/--patch) are not supported
+    /// for global packages; use explicit versions like `package@^2.0.0` instead.
     #[arg(value_name = "tool[@version]", required = true)]
     tools: Vec<String>,
 
@@ -47,6 +52,21 @@ impl Command for Update {
     fn run(self, session: &mut Session) -> Fallible<ExitCode> {
         session.add_event_start(ActivityKind::Update);
 
+        let result = self.do_update(session);
+
+        let exit_code = match &result {
+            Ok(code) => *code,
+            Err(err) => err.exit_code(),
+        };
+        session.add_event_end(ActivityKind::Update, exit_code);
+
+        result
+    }
+}
+
+impl Update {
+    /// Perform the actual update logic.
+    fn do_update(self, session: &mut Session) -> Fallible<ExitCode> {
         let in_project = session.project()?.is_some();
         let project_platform = session.project_platform()?.cloned();
 
@@ -69,12 +89,9 @@ impl Command for Update {
             }
         }
 
-        session.add_event_end(ActivityKind::Update, ExitCode::Success);
         Ok(ExitCode::Success)
     }
-}
 
-impl Update {
     /// Determine the scope (global vs project) for the update operation.
     ///
     /// # Errors
@@ -129,6 +146,8 @@ impl Update {
     ///
     /// Returns `CommandError::NoCurrentVersion` if a version constraint is specified
     /// but no current version is installed for the tool.
+    /// Returns `CommandError::PackageVersionLookupUnsupported` if a version constraint
+    /// is specified for a global package.
     /// Propagates session errors from platform lookup and version parse errors.
     fn resolve_target_version(
         &self,
@@ -192,13 +211,10 @@ fn get_explicit_version(tool: &ToolSpec) -> Option<VersionSpec> {
 /// # Errors
 ///
 /// Returns `CommandError::NoCurrentVersion` if no platform is configured or if the
-/// specific tool is not installed in the platform. Propagates session errors from
-/// platform lookup.
-fn get_current_version(
-    tool: &ToolSpec,
-    scope: &Scope,
-    session: &Session,
-) -> Fallible<nodejs_semver::Version> {
+/// specific tool is not installed in the platform.
+/// Returns `CommandError::PackageVersionLookupUnsupported` for global packages.
+/// Propagates session errors from platform lookup.
+fn get_current_version(tool: &ToolSpec, scope: &Scope, session: &Session) -> Fallible<Version> {
     let platform = match scope {
         Scope::Global => session.default_platform()?,
         Scope::Project => session.project_platform()?,
@@ -229,9 +245,11 @@ fn get_current_version(
             .into()
         }),
         ToolSpec::Package(name, _) => {
-            // For packages, we'd need to look up the installed version
-            // This is more complex and may require reading package configs
-            Err(CommandError::NoCurrentVersion { tool: name.clone() }.into())
+            // Package version lookup is not implemented; inform the user
+            Err(CommandError::PackageVersionLookupUnsupported {
+                package: name.clone(),
+            }
+            .into())
         }
     }
 }
