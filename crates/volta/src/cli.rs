@@ -74,6 +74,9 @@ pub enum Subcommand {
     /// Uninstalls a tool from your toolchain
     Uninstall(command::Uninstall),
 
+    /// Updates a tool in your toolchain to a newer version
+    Update(command::Update),
+
     /// Pins your project's runtime or package manager
     Pin(command::Pin),
 
@@ -111,6 +114,7 @@ impl Subcommand {
             Self::Fetch(fetch) => fetch.run(session),
             Self::Install(install) => install.run(session),
             Self::Uninstall(uninstall) => uninstall.run(session),
+            Self::Update(update) => update.run(session),
             Self::Pin(pin) => pin.run(session),
             Self::List(list) => list.run(session),
             Self::Completions(completions) => completions.run(session),
