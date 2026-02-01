@@ -1,8 +1,10 @@
 use nodejs_semver::Version;
 
 use volta_core::error::{CommandError, ExitCode, Fallible};
+use volta_core::layout::volta_home;
 use volta_core::platform::PlatformSpec;
 use volta_core::session::{ActivityKind, Session};
+use volta_core::tool::package::PackageConfig;
 use volta_core::tool::ToolSpec;
 use volta_core::version::VersionSpec;
 
@@ -21,9 +23,6 @@ enum Scope {
 #[allow(clippy::struct_excessive_bools)] // CLI flags are naturally bools
 pub struct Update {
     /// Tools to update, like `node`, `yarn@latest` or `typescript`.
-    ///
-    /// Note: Version constraints (--major/--minor/--patch) are not supported
-    /// for global packages; use explicit versions like `package@^2.0.0` instead.
     #[arg(value_name = "tool[@version]", required = true)]
     tools: Vec<String>,
 
@@ -151,8 +150,6 @@ impl Update {
     ///
     /// Returns `CommandError::NoCurrentVersion` if a version constraint is specified
     /// but no current version is installed for the tool.
-    /// Returns `CommandError::PackageVersionLookupUnsupported` if a version constraint
-    /// is specified for a global package.
     /// Propagates session errors from platform lookup and version parse errors.
     fn resolve_target_version(
         &self,
@@ -230,7 +227,6 @@ fn get_explicit_version(tool: &ToolSpec) -> Option<VersionSpec> {
 ///
 /// Returns `CommandError::NoCurrentVersion` if no platform is configured or if the
 /// specific tool is not installed in the platform.
-/// Returns `CommandError::PackageVersionLookupUnsupported` for global packages.
 /// Propagates session errors from platform lookup.
 fn get_current_version(tool: &ToolSpec, scope: &Scope, session: &Session) -> Fallible<Version> {
     let platform = match scope {
@@ -263,11 +259,14 @@ fn get_current_version(tool: &ToolSpec, scope: &Scope, session: &Session) -> Fal
             .into()
         }),
         ToolSpec::Package(name, _) => {
-            // Package version lookup is not implemented; inform the user
-            Err(CommandError::PackageVersionLookupUnsupported {
-                package: name.clone(),
-            }
-            .into())
+            // Look up the package version from the installed package config
+            let config_file = volta_home()?.default_package_config_file(name);
+            let config = PackageConfig::from_file_if_exists(&config_file)?.ok_or_else(|| {
+                CommandError::NoCurrentVersion {
+                    tool: name.clone(),
+                }
+            })?;
+            Ok(config.version)
         }
     }
 }
