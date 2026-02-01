@@ -27,7 +27,7 @@ END_TEXT_PAYLOAD
 }
 
 volta_install_dir() {
-  printf %s "${VOLTA_HOME:-"$HOME/.volta"}"
+  printf %s "${VOLTA_HOME:-"${HOME}/.volta"}"
 }
 
 volta_create_tree() {
@@ -82,7 +82,7 @@ volta_create_binaries() {
   rm -f "${INSTALL_DIR}"/bin/yarn
 
   for FILE_NAME in "${INSTALL_DIR}"/bin/*; do
-    if [ -e "${FILE_NAME}" ] && ! [ -d "${FILE_NAME}" ]; then
+    if [[ -e "${FILE_NAME}" ]] && ! [[ -d "${FILE_NAME}" ]]; then
       rm -f "${FILE_NAME}"
       ln -s "${INSTALL_DIR}"/shim "${FILE_NAME}"
     fi
@@ -97,8 +97,9 @@ volta_create_binaries() {
   chmod 755 "${INSTALL_DIR}/"/volta "${INSTALL_DIR}/bin"/* "${INSTALL_DIR}"/shim
 }
 
+# shellcheck disable=SC2329
 volta_try_profile() {
-  if [ -z "${1-}" ] || [ ! -f "${1}" ]; then
+  if [[ -z "${1-}" ]] || [[ ! -f "${1}" ]]; then
     return 1
   fi
   echo "${1}"
@@ -106,17 +107,17 @@ volta_try_profile() {
 
 # If file exists, echo it
 echo_fexists() {
-  [ -f "$1" ] && echo "$1"
+  [[ -f "$1" ]] && echo "$1"
 }
 
 volta_detect_profile() {
-  if [ -n "${PROFILE}" ] && [ -f "${PROFILE}" ]; then
+  if [[ -n "${PROFILE}" ]] && [[ -f "${PROFILE}" ]]; then
     echo "${PROFILE}"
     return
   fi
 
   # try to detect the current shell
-  case "$(basename "/$SHELL")" in
+  case "$(basename "/${SHELL}")" in
     bash)
       # Shells on macOS default to opening with a login shell, while Linuxes
       # default to a *non*-login shell, so if this is macOS we look for
@@ -125,18 +126,18 @@ volta_detect_profile() {
       # macOS (Darwin). It can be made narrower later if need be.
       case $(uname) in
         Darwin)
-          echo_fexists "$HOME/.bash_profile" || echo_fexists "$HOME/.bashrc"
+          echo_fexists "${HOME}/.bash_profile" || echo_fexists "${HOME}/.bashrc"
           ;;
         *)
-          echo_fexists "$HOME/.bashrc" || echo_fexists "$HOME/.bash_profile"
+          echo_fexists "${HOME}/.bashrc" || echo_fexists "${HOME}/.bash_profile"
           ;;
       esac
       ;;
     zsh)
-      echo_fexists "$HOME/.zshenv" || echo_fexists "$HOME/.zshrc"
+      echo_fexists "${HOME}/.zshenv" || echo_fexists "${HOME}/.zshrc"
       ;;
     fish)
-      echo "$HOME/.config/fish/config.fish"
+      echo "${HOME}/.config/fish/config.fish"
       ;;
     *)
       # Fall back to checking for profile file existence. Once again, the order
@@ -152,7 +153,7 @@ volta_detect_profile() {
       esac
 
       for profile in "${profiles[@]}"; do
-        echo_fexists "$HOME/$profile" && break
+        echo_fexists "${HOME}/${profile}" && break
       done
       ;;
   esac
@@ -165,13 +166,13 @@ volta_build_path_str() {
   PROFILE_INSTALL_DIR="$2"
 
   local PATH_STR
-  if [[ $PROFILE =~ \.fish$ ]]; then
+  if [[ ${PROFILE} =~ \.fish$ ]]; then
     PATH_STR="\\nset -gx VOLTA_HOME \"${PROFILE_INSTALL_DIR}\"\\ntest -s \"\$VOLTA_HOME/load.fish\"; and source \"\$VOLTA_HOME/load.fish\"\\n\\nstring match -r \".volta\" \"\$PATH\" > /dev/null; or set -gx PATH \"\$VOLTA_HOME/bin\" \$PATH"
   else
     PATH_STR="\\nexport VOLTA_HOME=\"${PROFILE_INSTALL_DIR}\"\\n[ -s \"\$VOLTA_HOME/load.sh\" ] && \\. \"\$VOLTA_HOME/load.sh\"\\n\\nexport PATH=\"\${VOLTA_HOME}/bin:\$PATH\""
   fi
 
-  echo "$PATH_STR"
+  echo "${PATH_STR}"
 }
 
 volta_eprintf() {
@@ -198,13 +199,15 @@ volta_warning() {
 }
 
 volta_install() {
-  if [ -n "${VOLTA_HOME-}" ] && [ -e "${VOLTA_HOME}" ] && ! [ -d "${VOLTA_HOME}" ]; then
+  if [[ -n "${VOLTA_HOME-}" ]] && [[ -e "${VOLTA_HOME}" ]] && ! [[ -d "${VOLTA_HOME}" ]]; then
     volta_error "\$VOLTA_HOME is set but is not a directory (${VOLTA_HOME})."
     volta_eprintf "Please check your profile scripts and environment."
     exit 1
   fi
 
-  volta_info 'Creating' "Volta directory tree ($(volta_install_dir))"
+  local VOLTA_DIR
+  VOLTA_DIR="$(volta_install_dir)"
+  volta_info 'Creating' "Volta directory tree (${VOLTA_DIR})"
   volta_create_tree
 
   volta_info 'Unpacking' "\`volta\` executable and shims"
@@ -212,16 +215,19 @@ volta_install() {
 
   local VOLTA_PROFILE
   VOLTA_PROFILE="$(volta_detect_profile)"
-  volta_info 'Editing' "user profile ($VOLTA_PROFILE)"
+  volta_info 'Editing' "user profile (${VOLTA_PROFILE})"
 
   local PROFILE_INSTALL_DIR
-  PROFILE_INSTALL_DIR=$(volta_install_dir | sed "s:^$HOME:\$HOME:")
+  local VOLTA_INSTALL_PATH
+  VOLTA_INSTALL_PATH="$(volta_install_dir)"
+  # shellcheck disable=SC2001
+  PROFILE_INSTALL_DIR=$(echo "${VOLTA_INSTALL_PATH}" | sed "s:^${HOME}:\$HOME:")
   local PATH_STR
-  PATH_STR="$(volta_build_path_str "$VOLTA_PROFILE" "$PROFILE_INSTALL_DIR")"
+  PATH_STR="$(volta_build_path_str "${VOLTA_PROFILE}" "${PROFILE_INSTALL_DIR}")"
 
-  if [ -z "${VOLTA_PROFILE-}" ] ; then
+  if [[ -z "${VOLTA_PROFILE-}" ]] ; then
     local TRIED_PROFILE
-    if [ -n "${PROFILE}" ]; then
+    if [[ -n "${PROFILE}" ]]; then
       TRIED_PROFILE="${VOLTA_PROFILE} (as defined in \$PROFILE), "
     fi
     volta_error "No user profile found."
@@ -231,8 +237,8 @@ volta_install() {
     volta_eprintf "${PATH_STR}"
     exit 1
   else
-    if ! command grep -qc 'VOLTA_HOME' "$VOLTA_PROFILE"; then
-      command printf "${PATH_STR}" >> "$VOLTA_PROFILE"
+    if ! command grep -qc 'VOLTA_HOME' "${VOLTA_PROFILE}"; then
+      command printf "${PATH_STR}" >> "${VOLTA_PROFILE}"
     else
       volta_eprintf ''
       volta_warning "Your profile (${VOLTA_PROFILE}) already mentions"
@@ -241,7 +247,7 @@ volta_install() {
     fi
   fi
 
-  if command grep -qc 'NOTION_HOME' "$VOLTA_PROFILE"; then
+  if command grep -qc 'NOTION_HOME' "${VOLTA_PROFILE}"; then
       volta_eprintf ''
       volta_warning "Your profile (${VOLTA_PROFILE}) mentions Notion."
       volta_eprintf "         You probably want to remove that."

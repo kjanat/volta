@@ -21,19 +21,19 @@ rpmdev-setuptree
 # create a tarball of the repo for the specified version
 # using prefix because the rpmbuild process expects a 'volta-<version>' directory
 # (https://rpm-packaging-guide.github.io/#putting-source-code-into-tarball)
-git archive --format=tar.gz --output=$archive_filename --prefix="volta-${release_version}/" HEAD
+git archive --format=tar.gz --output="${archive_filename}" --prefix="volta-${release_version}/" HEAD
 
 # move the archive to the SOURCES dir, after cleaning it up
 # (https://rpm-packaging-guide.github.io/#working-with-spec-files)
-rm -rf "$HOME/rmpbuild/SOURCES/"*
-mv "$archive_filename" "$HOME/rpmbuild/SOURCES/"
+rm -rf "${HOME}/rmpbuild/SOURCES/"*
+mv "${archive_filename}" "${HOME}/rpmbuild/SOURCES/"
 
 # copy the .spec file to SPECS dir
-cp dev/rpm/volta.spec "$HOME/rpmbuild/SPECS/"
+cp dev/rpm/volta.spec "${HOME}/rpmbuild/SPECS/"
 
 # build it!
 # (https://rpm-packaging-guide.github.io/#binary-rpms)
-rpmbuild -bb "$HOME/rpmbuild/SPECS/volta.spec"
+rpmbuild -bb "${HOME}/rpmbuild/SPECS/volta.spec"
 # (there will be a lot of output)
 
 # then install it and verify everything worked...

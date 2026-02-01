@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2317
 
 # This is the bootstrap Unix installer served by `https://get.volta.sh`.
 # Its responsibility is to query the system to determine what OS the system
@@ -19,11 +20,12 @@ download_release_from_repo() {
   local os_info="$2"
   local tmpdir="$3"
 
-  local filename="volta-$version-$os_info.tar.gz"
-  local download_file="$tmpdir/$filename"
-  local archive_url="$(release_url)/download/v$version/$filename"
+  local filename="volta-${version}-${os_info}.tar.gz"
+  local download_file="${tmpdir}/${filename}"
+  local archive_url
+  archive_url="$(release_url)/download/v${version}/${filename}"
 
-  curl --progress-bar --show-error --location --fail "$archive_url" --output "$download_file" --write-out "$download_file"
+  curl --progress-bar --show-error --location --fail "${archive_url}" --output "${download_file}" --write-out "${download_file}"
 }
 
 usage() {
@@ -47,7 +49,7 @@ END_USAGE
 info() {
   local action="$1"
   local details="$2"
-  command printf '\033[1;32m%12s\033[0m %s\n' "$action" "$details" 1>&2
+  command printf '\033[1;32m%12s\033[0m %s\n' "${action}" "${details}" 1>&2
 }
 
 error() {
@@ -73,8 +75,8 @@ bold() {
 # check for issue with VOLTA_HOME
 # if it is set, and exists, but is not a directory, the install will fail
 volta_home_is_ok() {
-  if [ -n "${VOLTA_HOME-}" ] && [ -e "$VOLTA_HOME" ] && ! [ -d "$VOLTA_HOME" ]; then
-    error "\$VOLTA_HOME is set but is not a directory ($VOLTA_HOME)."
+  if [[ -n "${VOLTA_HOME-}" ]] && [[ -e "${VOLTA_HOME}" ]] && ! [[ -d "${VOLTA_HOME}" ]]; then
+    error "\$VOLTA_HOME is set but is not a directory (${VOLTA_HOME})."
     eprintf "Please check your profile scripts and environment."
     return 1
   fi
@@ -88,31 +90,37 @@ upgrade_is_ok() {
   local is_dev_install="$3"
 
   # check for Volta in both the old location and the new 0.7.0 location
-  local volta_bin="$install_dir/volta"
-  if [ ! -x "$volta_bin" ]; then
-    volta_bin="$install_dir/bin/volta"
+  local volta_bin="${install_dir}/volta"
+  if [[ ! -x "${volta_bin}" ]]; then
+    volta_bin="${install_dir}/bin/volta"
   fi
 
   # this is not able to install Volta prior to 0.5.0 (when it was renamed)
-  if [[ "$will_install_version" =~ ^([0-9]+\.[0-9]+) ]]; then
+  if [[ "${will_install_version}" =~ ^([0-9]+\.[0-9]+) ]]; then
     local major_minor="${BASH_REMATCH[1]}"
-    case "$major_minor" in
+    case "${major_minor}" in
       0.1|0.2|0.3|0.4|0.5)
         eprintf ""
         error "Cannot install Volta prior to version 0.6.0"
-        request "    To install Volta version $will_install_version, please check out the source and build manually."
+        request "    To install Volta version ${will_install_version}, please check out the source and build manually."
         eprintf ""
         return 1
+        ;;
+      *)
+        # Valid version, continue
         ;;
     esac
   fi
 
-  if [[ -n "$install_dir" && -x "$volta_bin" ]]; then
-    local prev_version="$( ($volta_bin --version 2>/dev/null || echo 0.1) | sed -E 's/^.*([0-9]+\.[0-9]+\.[0-9]+).*$/\1/')"
+  if [[ -n "${install_dir}" && -x "${volta_bin}" ]]; then
+    local prev_version
+    local volta_version_output
+    volta_version_output="$("${volta_bin}" --version 2>/dev/null || echo 0.1)"
+    prev_version="$(echo "${volta_version_output}" | sed -E 's/^.*([0-9]+\.[0-9]+\.[0-9]+).*$/\1/')"
     # if this is a local dev install, skip the equality check
     # if installing the same version, this is a no-op
-    if [ "$is_dev_install" != "true" ] && [ "$prev_version" == "$will_install_version" ]; then
-      eprintf "Version $will_install_version already installed"
+    if [[ "${is_dev_install}" != "true" ]] && [[ "${prev_version}" == "${will_install_version}" ]]; then
+      eprintf "Version ${will_install_version} already installed"
       return 1
     fi
     # in the future, check $prev_version for incompatible upgrades
@@ -123,13 +131,14 @@ upgrade_is_ok() {
 # returns the os name to be used in the packaged release
 parse_os_info() {
   local uname_str="$1"
-  local arch="$(uname -m)"
+  local arch
+  arch="$(uname -m)"
 
-  case "$uname_str" in
+  case "${uname_str}" in
     Linux)
-      if [ "$arch" == "x86_64" ]; then
+      if [[ "${arch}" == "x86_64" ]]; then
         echo "linux"
-      elif [ "$arch" == "aarch64" ]; then
+      elif [[ "${arch}" == "aarch64" ]]; then
         echo "linux-arm"
       else
         error "Releases for architectures other than x64 and arm are not currently supported."
@@ -148,7 +157,7 @@ parse_os_info() {
 parse_os_pretty() {
   local uname_str="$1"
 
-  case "$uname_str" in
+  case "${uname_str}" in
     Linux)
       echo "Linux"
       ;;
@@ -156,7 +165,7 @@ parse_os_pretty() {
       echo "macOS"
       ;;
     *)
-      echo "$uname_str"
+      echo "${uname_str}"
   esac
 }
 
@@ -170,7 +179,7 @@ element_in() {
   local element;
   # loop over the input arguments and return when a match is found
   for element in "$@"; do
-    [ "$element" == "$match" ] && return 0
+    [[ "${element}" == "${match}" ]] && return 0
   done
   return 1
 }
@@ -183,10 +192,9 @@ create_tree() {
   # .volta/
   #     bin/
 
-  mkdir -p "$install_dir" && mkdir -p "$install_dir"/bin
-  if [ "$?" != 0 ]
+  if ! mkdir -p "${install_dir}" || ! mkdir -p "${install_dir}"/bin
   then
-    error "Could not create directory layout. Please make sure the target directory is writeable: $install_dir"
+    error "Could not create directory layout. Please make sure the target directory is writeable: ${install_dir}"
     exit 1
   fi
 }
@@ -200,34 +208,36 @@ install_version() {
     exit 1
   fi
 
-  case "$version_to_install" in
+  case "${version_to_install}" in
     latest)
-      local latest_version="$(get_latest_release)"
-      info 'Installing' "latest version of Volta ($latest_version)"
-      install_release "$latest_version" "$install_dir"
+      local latest_version
+      latest_version="$(get_latest_release)"
+      info 'Installing' "latest version of Volta (${latest_version})"
+      install_release "${latest_version}" "${install_dir}"
       ;;
     local-dev)
       info 'Installing' "Volta locally after compiling"
-      install_local "dev" "$install_dir"
+      install_local "dev" "${install_dir}"
       ;;
     local-release)
       info 'Installing' "Volta locally after compiling with '--release'"
-      install_local "release" "$install_dir"
+      install_local "release" "${install_dir}"
       ;;
     *)
       # assume anything else is a specific version
-      info 'Installing' "Volta version $version_to_install"
-      install_release "$version_to_install" "$install_dir"
+      info 'Installing' "Volta version ${version_to_install}"
+      install_release "${version_to_install}" "${install_dir}"
       ;;
   esac
 
-  if [ "$?" == 0 ]
+  # shellcheck disable=SC2181
+  if [[ "$?" == 0 ]]
   then
-      if [ "$should_run_setup" == "true" ]; then
+      if [[ "${should_run_setup}" == "true" ]]; then
         info 'Finished' "installation. Updating user profile settings."
-        "$install_dir"/bin/volta setup
+        "${install_dir}"/bin/volta setup
       else
-        "$install_dir"/bin/volta --version &>/dev/null # creates the default shims
+        "${install_dir}"/bin/volta --version &>/dev/null # creates the default shims
         info 'Finished' "installation. No changes were made to user profile settings."
       fi
   fi
@@ -240,12 +250,12 @@ parse_cargo_version() {
 
   while read -r line
   do
-    if [[ "$line" =~ ^version\ =\ \"(.*)\" ]]
+    if [[ "${line}" =~ ^version\ =\ \"(.*)\" ]]
     then
       echo "${BASH_REMATCH[1]}"
       return 0
     fi
-  done <<< "$contents"
+  done <<< "${contents}"
 
   error "Could not determine the current version from Cargo.toml"
   return 1
@@ -257,17 +267,19 @@ install_release() {
   local is_dev_install="false"
 
   info 'Checking' "for existing Volta installation"
-  if upgrade_is_ok "$version" "$install_dir" "$is_dev_install"
+  if upgrade_is_ok "${version}" "${install_dir}" "${is_dev_install}"
   then
-    download_archive="$(download_release "$version"; exit "$?")"
+    download_archive="$(download_release "${version}"; exit "$?")"
     exit_status="$?"
-    if [ "$exit_status" != 0 ]
+    if [[ "${exit_status}" != 0 ]]
     then
-      error "Could not download Volta version '$version'. See $(release_url) for a list of available releases"
-      return "$exit_status"
+      local releases_url
+      releases_url="$(release_url)"
+      error "Could not download Volta version '${version}'. See ${releases_url} for a list of available releases"
+      return "${exit_status}"
     fi
 
-    install_from_file "$download_archive" "$install_dir"
+    install_from_file "${download_archive}" "${install_dir}"
   else
     # existing legacy install, or upgrade problem
     return 1
@@ -282,11 +294,11 @@ install_local() {
 
   info 'Checking' "for existing Volta installation"
   install_version="$(parse_cargo_version "$(<Cargo.toml)" )" || return 1
-  if upgrade_is_ok "$install_version" "$install_dir" "$is_dev_install"
+  if upgrade_is_ok "${install_version}" "${install_dir}" "${is_dev_install}"
   then
     # compile and package the binaries, then install from that local archive
-    compiled_archive="$(compile_and_package "$dev_or_release")" &&
-      install_from_file "$compiled_archive" "$install_dir"
+    compiled_archive="$(compile_and_package "${dev_or_release}")" &&
+      install_from_file "${compiled_archive}" "${install_dir}"
   else
     # existing legacy install, or upgrade problem
     return 1
@@ -304,11 +316,13 @@ compile_and_package() {
 
   # call the release script to create the packaged archive file
   # '2> >(tee /dev/stderr)' copies stderr to stdout, to collect it and parse the filename
-  release_output="$( "$DIR/release.sh" "--$dev_or_release" 2> >(tee /dev/stderr) )"
-  [ "$?" != 0 ] && return 1
+  # shellcheck disable=SC2312
+  release_output="$( "${DIR}/release.sh" "--${dev_or_release}" 2> >(tee /dev/stderr) )"
+  # shellcheck disable=SC2181
+  [[ "$?" != 0 ]] && return 1
 
   # parse the release filename and return that
-  if [[ "$release_output" =~ release\ in\ file\ (target[^\ ]+) ]]; then
+  if [[ "${release_output}" =~ release\ in\ file\ (target[^\ ]+) ]]; then
     echo "${BASH_REMATCH[1]}"
   else
     error "Could not determine output filename"
@@ -319,30 +333,34 @@ compile_and_package() {
 download_release() {
   local version="$1"
 
-  local uname_str="$(uname -s)"
+  local uname_str
+  uname_str="$(uname -s)"
   local os_info
-  os_info="$(parse_os_info "$uname_str")"
-  if [ "$?" != 0 ]; then
-    error "The current operating system ($uname_str) does not appear to be supported by Volta."
+  os_info="$(parse_os_info "${uname_str}")"
+  # shellcheck disable=SC2181
+  if [[ "$?" != 0 ]]; then
+    error "The current operating system (${uname_str}) does not appear to be supported by Volta."
     return 1
   fi
-  local pretty_os_name="$(parse_os_pretty "$uname_str")"
+  local pretty_os_name
+  pretty_os_name="$(parse_os_pretty "${uname_str}")"
 
-  info 'Fetching' "archive for $pretty_os_name, version $version"
+  info 'Fetching' "archive for ${pretty_os_name}, version ${version}"
   # store the downloaded archive in a temporary directory
-  local download_dir="$(mktemp -d)"
-  download_release_from_repo "$version" "$os_info" "$download_dir"
+  local download_dir
+  download_dir="$(mktemp -d)"
+  download_release_from_repo "${version}" "${os_info}" "${download_dir}"
 }
 
 install_from_file() {
   local archive="$1"
   local install_dir="$2"
 
-  create_tree "$install_dir"
+  create_tree "${install_dir}"
 
   info 'Extracting' "Volta binaries and launchers"
   # extract the files to the specified directory
-  tar -xf "$archive" -C "$install_dir"/bin
+  tar -xf "${archive}" -C "${install_dir}"/bin
 }
 
 # return if sourced (for testing the functions above)
@@ -355,14 +373,14 @@ version_to_install="latest"
 should_run_setup="true"
 
 # install to VOLTA_HOME, defaulting to ~/.volta
-install_dir="${VOLTA_HOME:-"$HOME/.volta"}"
+install_dir="${VOLTA_HOME:-"${HOME}/.volta"}"
 
 # parse command line options
-while [ $# -gt 0 ]
+while [[ $# -gt 0 ]]
 do
   arg="$1"
 
-  case "$arg" in
+  case "${arg}" in
     -h|--help)
       usage
       exit 0
@@ -385,11 +403,11 @@ do
       should_run_setup="false"
       ;;
     *)
-      error "unknown option: '$arg'"
+      error "unknown option: '${arg}'"
       usage
       exit 1
       ;;
   esac
 done
 
-install_version "$version_to_install" "$install_dir" "$should_run_setup"
+install_version "${version_to_install}" "${install_dir}" "${should_run_setup}"
