@@ -191,8 +191,8 @@ impl CommandError {
             | Self::NotPinnedInProject { .. }
             | Self::NotInProject => ExitCode::InvalidArguments,
 
-            // Unimplemented feature
-            Self::PackageVersionLookupUnsupported { .. } => ExitCode::UnknownError,
+            // Not yet implemented feature
+            Self::PackageVersionLookupUnsupported { .. } => ExitCode::NotYetImplemented,
         }
     }
 }

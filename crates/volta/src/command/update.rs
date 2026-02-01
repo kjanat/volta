@@ -256,7 +256,8 @@ fn get_current_version(tool: &ToolSpec, scope: &Scope, session: &Session) -> Fal
 
 /// Check if a tool is pinned in the project.
 #[must_use]
-const fn is_tool_pinned(tool: &ToolSpec, project_platform: Option<&PlatformSpec>) -> bool {
+#[allow(clippy::missing_const_for_fn, reason = "intentionally non-const for future flexibility if PlatformSpec changes")]
+fn is_tool_pinned(tool: &ToolSpec, project_platform: Option<&PlatformSpec>) -> bool {
     let Some(platform) = project_platform else {
         return false;
     };
