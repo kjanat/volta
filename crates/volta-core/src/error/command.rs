@@ -43,6 +43,18 @@ pub enum CommandError {
 
     /// Completions output file already exists.
     CompletionsOutputExists { path: PathBuf },
+
+    /// Tried to update a tool that is not pinned in the current project.
+    NotPinnedInProject { tool: String },
+
+    /// Tried to update in project context but not in a project.
+    NotInProject,
+
+    /// No current version installed for the tool (needed for constrained updates).
+    NoCurrentVersion { tool: String },
+
+    /// Package version lookup is not supported for constrained updates.
+    PackageVersionLookupUnsupported { package: String },
 }
 
 impl fmt::Display for CommandError {
@@ -123,6 +135,35 @@ This project is configured to use version {version} of npm."
 Please remove the file or pass `-f` or `--force` to override.",
                 path.display()
             ),
+            Self::NotPinnedInProject { tool } => write!(
+                f,
+                "'{tool}' is not pinned in this project.
+
+Only tools (node, npm, yarn, pnpm) can be pinned to a project; packages cannot.
+Use `volta update --global {tool}` to update your default, or if this is a tool,
+run `volta pin {tool}` to add it to the project first."
+            ),
+            Self::NotInProject => write!(
+                f,
+                "Not in a project directory.
+
+The --project flag requires being in a directory with a package.json file."
+            ),
+            Self::NoCurrentVersion { tool } => write!(
+                f,
+                "No current version of '{tool}' is installed.
+
+Cannot determine version constraints without a current version.
+Use `volta update {tool}` without --major/--minor/--patch to install the latest version."
+            ),
+            Self::PackageVersionLookupUnsupported { package } => write!(
+                f,
+                "Version lookup for package '{package}' is not supported.
+
+Constrained updates (--major/--minor/--patch) require looking up the current
+installed version, which is not yet implemented for global packages.
+Use `volta update {package}` without version constraints to update to latest."
+            ),
         }
     }
 }
@@ -133,7 +174,9 @@ impl CommandError {
     pub const fn exit_code(&self) -> ExitCode {
         match self {
             // ConfigurationError
-            Self::NoPnpmSpecified | Self::NoYarnSpecified => ExitCode::ConfigurationError,
+            Self::NoPnpmSpecified
+            | Self::NoYarnSpecified
+            | Self::NoCurrentVersion { .. } => ExitCode::ConfigurationError,
 
             // ExecutableNotFound
             Self::NpxUnavailable { .. } => ExitCode::ExecutableNotFound,
@@ -145,7 +188,12 @@ impl CommandError {
             Self::Deprecated { .. }
             | Self::InvalidToolVersion { .. }
             | Self::InvalidBareVersion { .. }
-            | Self::CompletionsOutputExists { .. } => ExitCode::InvalidArguments,
+            | Self::CompletionsOutputExists { .. }
+            | Self::NotPinnedInProject { .. }
+            | Self::NotInProject => ExitCode::InvalidArguments,
+
+            // Not yet implemented feature
+            Self::PackageVersionLookupUnsupported { .. } => ExitCode::NotYetImplemented,
         }
     }
 }

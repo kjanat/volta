@@ -6,7 +6,7 @@ use nodejs_semver::{Range, Version};
 
 mod serial;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[allow(clippy::module_name_repetitions)]
 pub enum VersionSpec {
@@ -24,7 +24,7 @@ pub enum VersionSpec {
     Tag(Tag),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum Tag {
     /// The 'latest' tag, a special case that exists for all packages

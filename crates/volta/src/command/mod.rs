@@ -6,6 +6,7 @@ pub mod pin;
 pub mod run;
 pub mod setup;
 pub mod uninstall;
+pub mod update;
 pub mod r#use;
 pub mod which;
 
@@ -18,6 +19,7 @@ pub use pin::Pin;
 pub use run::Run;
 pub use setup::Setup;
 pub use uninstall::Uninstall;
+pub use update::Update;
 pub use r#use::Use;
 
 use volta_core::error::{ExitCode, Fallible};
