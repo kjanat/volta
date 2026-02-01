@@ -2,12 +2,12 @@
 name                 = "volta-layout"
 version              = "0.1.1"
 edition.workspace    = true
+description          = "Volta directory layout definitions"
+readme.workspace     = true
 repository.workspace = true
 license.workspace    = true
-readme.workspace     = true
 keywords.workspace   = true
 categories.workspace = true
-description          = "Volta directory layout definitions"
 
 [dependencies]
 volta-layout-macro.workspace = true

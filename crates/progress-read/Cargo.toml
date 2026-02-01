@@ -2,12 +2,12 @@
 name                 = "progress-read"
 version              = "0.1.0"
 edition.workspace    = true
+description          = "Progress-tracking reader wrapper for Volta"
+readme.workspace     = true
 repository.workspace = true
 license.workspace    = true
-readme.workspace     = true
 keywords.workspace   = true
 categories.workspace = true
-description          = "Progress-tracking reader wrapper for Volta"
 
 [dependencies]
 

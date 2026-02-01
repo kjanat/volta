@@ -2,12 +2,12 @@
 name                 = "volta-migrate"
 version              = "0.1.0"
 edition.workspace    = true
+description          = "Migration utilities for Volta directory layouts"
+readme.workspace     = true
 repository.workspace = true
 license.workspace    = true
-readme.workspace     = true
 keywords.workspace   = true
 categories.workspace = true
-description          = "Migration utilities for Volta directory layouts"
 
 [dependencies]
 log.workspace           = true

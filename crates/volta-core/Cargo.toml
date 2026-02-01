@@ -2,12 +2,12 @@
 name                 = "volta-core"
 version              = "0.1.0"
 edition.workspace    = true
+description          = "Core library for Volta JS toolchain manager"
+readme.workspace     = true
 repository.workspace = true
 license.workspace    = true
-readme.workspace     = true
 keywords.workspace   = true
 categories.workspace = true
-description          = "Core library for Volta JS toolchain manager"
 
 [dependencies]
 archive.workspace                   = true

@@ -2,12 +2,12 @@
 name                 = "test-support"
 version              = "0.1.0"
 edition.workspace    = true
+description          = "Test utilities and matchers for Volta"
+readme.workspace     = true
 repository.workspace = true
 license.workspace    = true
-readme.workspace     = true
 keywords.workspace   = true
 categories.workspace = true
-description          = "Test utilities and matchers for Volta"
 
 [dependencies]
 hamcrest2.workspace  = true

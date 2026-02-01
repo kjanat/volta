@@ -2,12 +2,12 @@
 name                 = "volta-layout-macro"
 version              = "0.1.0"
 edition.workspace    = true
+description          = "Proc-macro for Volta directory layout definitions"
+readme.workspace     = true
 repository.workspace = true
 license.workspace    = true
-readme.workspace     = true
 keywords.workspace   = true
 categories.workspace = true
-description          = "Proc-macro for Volta directory layout definitions"
 
 [lib]
 proc-macro = true

@@ -1,10 +1,11 @@
 # Volta Agent Guidelines
 
-Volta is a JavaScript toolchain manager written in Rust. It manages Node.js, npm, pnpm, and Yarn versions.
+Volta is a JavaScript toolchain manager written in Rust. It manages Node.js,
+npm, pnpm, and Yarn versions.
 
 ## Project Structure
 
-```
+```tree
 crates/
   volta/           # Main CLI binary (commands: fetch, install, list, pin, run, setup, uninstall, use, which)
   volta-core/      # Core library (error, platform, tools, session, hooks, etc.)
@@ -80,8 +81,9 @@ use crate::cli::Volta;
 use volta_core::error::{Context, ErrorKind, Fallible};
 
 fn read_config(path: &Path) -> Fallible<Config> {
-    std::fs::read_to_string(path)
-        .with_context(|| ErrorKind::ReadFileError { file: path.to_owned() })
+    std::fs::read_to_string(path).with_context(|| ErrorKind::ReadFileError {
+        file: path.to_owned(),
+    })
 }
 ```
 
@@ -116,15 +118,15 @@ fn read_config(path: &Path) -> Fallible<Config> {
 Strict lints enforced (see `Cargo.toml`):
 
 ```toml
-unsafe_code = "deny"
-pedantic = "warn"
-nursery = "warn"
+unsafe_code             = "deny"
+pedantic                = "warn"
+nursery                 = "warn"
 module_name_repetitions = "deny"
-needless_pass_by_value = "deny"
-option_if_let_else = "deny"
-manual_let_else = "deny"
-doc_markdown = "deny"
-missing_panics_doc = "deny"
+needless_pass_by_value  = "deny"
+option_if_let_else      = "deny"
+manual_let_else         = "deny"
+doc_markdown            = "deny"
+missing_panics_doc      = "deny"
 ```
 
 Add targeted `#[allow]` when legitimately needed:
@@ -138,7 +140,8 @@ pub struct ErrorKind { ... }
 
 ### Version Types
 
-- `VersionSpec` - User input: `None`, `Semver(Range)`, `Exact(Version)`, `Tag(Tag)`
+- `VersionSpec` - User input: `None`, `Semver(Range)`, `Exact(Version)`,
+  `Tag(Tag)`
 - `Tag` - Version tag: `Latest`, `Lts`, `Custom(String)`
 - `Version` - Resolved semver (from `nodejs_semver`)
 
@@ -177,7 +180,7 @@ mod tests {
 Use `test-support` crate utilities:
 
 ```rust
-use test_support::{ok_or_panic, matchers, ProcessBuilder};
+use test_support::{ProcessBuilder, matchers, ok_or_panic};
 ```
 
 Platform-specific tests use `#[cfg(unix)]` / `#[cfg(windows)]`.

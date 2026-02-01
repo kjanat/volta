@@ -2,12 +2,12 @@
 name                 = "validate-npm-package-name"
 version              = "0.1.0"
 edition.workspace    = true
+description          = "NPM package name validation for Volta"
+readme.workspace     = true
 repository.workspace = true
 license.workspace    = true
-readme.workspace     = true
 keywords.workspace   = true
 categories.workspace = true
-description          = "NPM package name validation for Volta"
 
 [lib]
 
